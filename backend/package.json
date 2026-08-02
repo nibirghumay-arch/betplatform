@@ -4,8 +4,7 @@
   "description": "Production-grade online gaming platform — NestJS backend",
   "scripts": {
     "build": "nest build",
-"postinstall": "prisma generate",
-"start": "prisma migrate deploy && node dist/main",
+"start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "test": "jest",
