@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mines</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 14px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 22px 18px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+    .hud { display: flex; justify-content: space-between; align-items: center; }
+    .hud-box { text-align: center; }
+    .hud-box .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .hud-box .val { font-size: 22px; font-weight: 700; color: #10b981; }
+    .hud-box .val.red { color: #ef4444; }
+    .mine-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
+    .cell { aspect-ratio: 1; background: #1f1f1f; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer; transition: all .15s; user-select: none; }
+    .cell:hover:not(.open):not(.disabled) { background: #2a2a2a; border-color: rgba(245,158,11,.35); transform: scale(1.04); }
+    .cell.open.safe { background: #0d2218; border-color: rgba(16,185,129,.3); cursor: default; }
+    .cell.open.mine { background: #2d1010; border-color: rgba(239,68,68,.4); cursor: default; }
+    .cell.disabled { opacity: .5; cursor: default; }
+    .cell.reveal-mine { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); }
+    .cashout-btn { width: 100%; padding: 13px; background: #10b981; border: none; border-radius: 11px; color: #fff; font-size: 14px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .cashout-btn:hover:not(:disabled) { background: #059669; }
+    .cashout-btn:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .result { font-size: 16px; font-weight: 700; min-height: 24px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #ef4444; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>💣 Mines</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="card">
+    <div class="hud">
+      <div class="hud-box"><div class="lbl">Safe Found</div><div class="val" id="safe">0</div></div>
+      <div class="hud-box"><div class="lbl">Multiplier</div><div class="val" id="mult">—</div></div>
+      <div class="hud-box"><div class="lbl">Mines Left</div><div class="val red">5</div></div>
+    </div>
+    <div class="mine-grid" id="grid"></div>
+    <button class="cashout-btn" id="cashout" disabled>Cash Out</button>
+    <div class="result" id="res"></div>
+    <div>
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+  </div>
+  <script>
+    var MINE_COUNT=5, GRID=25;
+    var MULTS=[0,1.1,1.25,1.45,1.7,2.0,2.4,2.9,3.6,4.5,5.7,7.2,9.2,11.9,15.6,20.7,27.8,38.0,53.2,76.0,111.0,166.0,256.0,416.0,702.0,1200.0];
+    var bet=1, busy=false, rid=null, cur='USD', active=false, safeCount=0, mines=[];
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var statEl=document.getElementById('stat'), goBtn=document.getElementById('go');
+    var cashoutBtn=document.getElementById('cashout'), gridEl=document.getElementById('grid');
+    var safeEl=document.getElementById('safe'), multEl=document.getElementById('mult');
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+    function updHud(){safeEl.textContent=safeCount;multEl.textContent='×'+MULTS[safeCount].toFixed(2);}
+
+    function placeMines(){
+      mines=[];
+      var positions=Array.from({length:GRID},function(_,i){return i;});
+      for(var i=positions.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=positions[i];positions[i]=positions[j];positions[j]=t;}
+      for(var i=0;i<MINE_COUNT;i++) mines.push(positions[i]);
+    }
+
+    function buildGrid(playable){
+      gridEl.innerHTML='';
+      for(var i=0;i<GRID;i++){
+        (function(idx){
+          var cell=document.createElement('div');
+          cell.className='cell'+(playable?'':' disabled');
+          cell.textContent='';
+          if(playable){
+            cell.addEventListener('click',function(){
+              if(!active||cell.classList.contains('open'))return;
+              cell.classList.add('open');
+              if(mines.indexOf(idx)>=0){
+                // Mine!
+                cell.classList.add('mine');
+                cell.textContent='💥';
+                active=false;cashoutBtn.disabled=true;
+                // Reveal all mines
+                gridEl.querySelectorAll('.cell').forEach(function(c,ci){
+                  if(!c.classList.contains('open')&&mines.indexOf(ci)>=0){c.classList.add('reveal-mine');c.textContent='💣';}
+                  c.classList.add('disabled');
+                });
+                resEl.className='result loss';resEl.textContent='💥 Mine hit — lost $'+bet.toFixed(2)+'!';
+                setStat('');busy=false;goBtn.disabled=false;
+              } else {
+                cell.classList.add('safe');cell.textContent='💎';
+                safeCount++;updHud();
+                if(safeCount>=GRID-MINE_COUNT){
+                  // Won all safe tiles
+                  var wa=(bet*MULTS[safeCount]).toFixed(2);
+                  active=false;cashoutBtn.disabled=true;
+                  gridEl.querySelectorAll('.cell').forEach(function(c){c.classList.add('disabled');});
+                  resEl.className='result win';resEl.textContent='🎉 Board cleared! WIN $'+wa;
+                  setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);
+                }
+              }
+            });
+          }
+          gridEl.appendChild(cell);
+        })(i);
+      }
+    }
+
+    cashoutBtn.addEventListener('click',function(){
+      if(!active||safeCount===0)return;
+      active=false;cashoutBtn.disabled=true;
+      gridEl.querySelectorAll('.cell').forEach(function(c,ci){
+        if(!c.classList.contains('open')){
+          if(mines.indexOf(ci)>=0){c.classList.add('reveal-mine');c.textContent='💣';}
+          c.classList.add('disabled');
+        }
+      });
+      var wa=(bet*MULTS[safeCount]).toFixed(2);
+      resEl.className='result win';resEl.textContent='🎉 Cashed out $'+wa+' at ×'+MULTS[safeCount].toFixed(2)+'!';
+      setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);
+    });
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';
+      safeCount=0;updHud();placeMines();buildGrid(false);setStat('Placing bet…');
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='START';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);active=true;buildGrid(true);
+        cashoutBtn.disabled=false;setStat('Click tiles — avoid the mines!');
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);active=false;cashoutBtn.disabled=true;busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

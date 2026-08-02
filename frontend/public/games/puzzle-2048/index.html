@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2048 Puzzle</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 12px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .hud { display: flex; gap: 10px; width: 100%; max-width: 340px; }
+    .hud-box { flex: 1; background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 8px; text-align: center; }
+    .hud-box .lbl { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.2px; }
+    .hud-box .val { font-size: 18px; font-weight: 700; color: #fff; }
+    .board-wrap { background: #1a1a1a; border-radius: 14px; padding: 10px; }
+    .board { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; width: 300px; }
+    .tile { width: 66px; height: 66px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+    .t0{background:#1a1a1a;color:#1a1a1a}
+    .t2{background:#3b3527;color:#f5e1a0;font-size:26px}
+    .t4{background:#4a4020;color:#f5d060;font-size:26px}
+    .t8{background:#7a3010;color:#fbbf24}
+    .t16{background:#8a2a0a;color:#fbbf24}
+    .t32{background:#a02010;color:#fff}
+    .t64{background:#c01808;color:#fff}
+    .t128{background:#065f46;color:#6ee7b7;font-size:18px}
+    .t256{background:#047857;color:#a7f3d0;font-size:18px}
+    .t512{background:#1d4ed8;color:#bfdbfe;font-size:18px}
+    .t1024{background:#4f46e5;color:#e0e7ff;font-size:14px}
+    .t2048{background:#f59e0b;color:#000;font-size:14px}
+    .result { font-size: 17px; font-weight: 700; min-height: 26px; text-align: center; width: 100%; max-width: 340px; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; width: 100%; max-width: 340px; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; max-width: 340px; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; width: 100%; max-width: 340px; }
+    .stat.err { color: #ef4444; }
+    .hint { font-size: 11px; color: #4b5563; text-align: center; }
+    .pt { font-size: 11px; color: #4b5563; text-align: center; max-width: 340px; }
+    .pt span { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>🧩 2048</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="hud">
+    <div class="hud-box"><div class="lbl">Score</div><div class="val" id="score">0</div></div>
+    <div class="hud-box"><div class="lbl">Best Tile</div><div class="val" id="best">—</div></div>
+    <div class="hud-box"><div class="lbl">Win</div><div class="val" id="winshow">—</div></div>
+  </div>
+  <div class="board-wrap"><div class="board" id="board"></div></div>
+  <div class="result" id="res"></div>
+  <div class="hint">Arrow keys or swipe to move tiles</div>
+  <div>
+    <div class="row-lbl" style="text-align:center">Bet Amount</div>
+    <div class="bet-btns">
+      <button class="b-btn act" data-v="1">$1</button>
+      <button class="b-btn" data-v="5">$5</button>
+      <button class="b-btn" data-v="10">$10</button>
+      <button class="b-btn" data-v="25">$25</button>
+    </div>
+  </div>
+  <button class="go" id="go" disabled>Connecting…</button>
+  <div class="stat" id="stat">Connecting to platform…</div>
+  <div class="pt">Reach <span>256</span>=×1.5 · <span>512</span>=×2 · <span>1024</span>=×4 · <span>2048</span>=×10</div>
+  <script>
+    var SIZE=4, grid=[], score=0, bestTile=0, gameActive=false, won=false;
+    var bet=1, busy=false, rid=null, cur='USD';
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var statEl=document.getElementById('stat'), goBtn=document.getElementById('go');
+    var boardEl=document.getElementById('board'), scoreEl=document.getElementById('score');
+    var bestEl=document.getElementById('best'), winshowEl=document.getElementById('winshow');
+    var WIN_TABLE=[[2048,10],[1024,4],[512,2],[256,1.5]];
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+    function getCurMult(){var m=0;WIN_TABLE.forEach(function(t){if(bestTile>=t[0])m=t[1];});return m;}
+
+    function newGrid(){grid=[];for(var i=0;i<SIZE;i++){grid[i]=[];for(var j=0;j<SIZE;j++)grid[i][j]=0;}score=0;bestTile=0;won=false;addTile();addTile();}
+    function emptyTiles(){var a=[];for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++)if(!grid[r][c])a.push([r,c]);return a;}
+    function addTile(){var e=emptyTiles();if(!e.length)return;var pos=e[Math.floor(Math.random()*e.length)];grid[pos[0]][pos[1]]=Math.random()<0.9?2:4;}
+
+    function renderBoard(){
+      boardEl.innerHTML='';
+      for(var r=0;r<SIZE;r++){
+        for(var c=0;c<SIZE;c++){
+          var v=grid[r][c];
+          var d=document.createElement('div');
+          d.className='tile t'+(v<=2048?v:2048);
+          d.textContent=v||'';
+          boardEl.appendChild(d);
+        }
+      }
+      scoreEl.textContent=score;
+      bestEl.textContent=bestTile||'—';
+      var m=getCurMult();
+      winshowEl.textContent=m>0?'×'+m:'—';
+    }
+
+    function slideRow(row){
+      var a=row.filter(function(v){return v;}), res=[], i=0;
+      while(i<a.length){
+        if(i+1<a.length&&a[i]===a[i+1]){var v=a[i]*2;res.push(v);score+=v;if(v>bestTile)bestTile=v;i+=2;}
+        else{res.push(a[i]);i++;}
+      }
+      while(res.length<SIZE)res.push(0);
+      return res;
+    }
+
+    function moved(a,b){return a.join(',')!==b.join(',');}
+    function moveLeft(){var mv=false;for(var r=0;r<SIZE;r++){var o=grid[r].slice(),n=slideRow(grid[r]);if(moved(o,n)){mv=true;grid[r]=n;}}return mv;}
+    function moveRight(){var mv=false;for(var r=0;r<SIZE;r++){var o=grid[r].slice(),n=slideRow(grid[r].slice().reverse()).reverse();if(moved(o,n)){mv=true;grid[r]=n;}}return mv;}
+    function moveUp(){var mv=false;for(var c=0;c<SIZE;c++){var col=[];for(var r=0;r<SIZE;r++)col.push(grid[r][c]);var nc=slideRow(col);if(moved(col,nc)){mv=true;for(var r=0;r<SIZE;r++)grid[r][c]=nc[r];}}return mv;}
+    function moveDown(){var mv=false;for(var c=0;c<SIZE;c++){var col=[];for(var r=0;r<SIZE;r++)col.push(grid[r][c]);var nc=slideRow(col.slice().reverse()).reverse();if(moved(col,nc)){mv=true;for(var r=0;r<SIZE;r++)grid[r][c]=nc[r];}}return mv;}
+
+    function canMove(){
+      for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++){
+        if(!grid[r][c])return true;
+        if(r+1<SIZE&&grid[r][c]===grid[r+1][c])return true;
+        if(c+1<SIZE&&grid[r][c]===grid[r][c+1])return true;
+      }
+      return false;
+    }
+
+    function doMove(dir){
+      if(!gameActive)return;
+      var mv=false;
+      if(dir==='left')mv=moveLeft();
+      else if(dir==='right')mv=moveRight();
+      else if(dir==='up')mv=moveUp();
+      else mv=moveDown();
+      if(!mv)return;
+      addTile();renderBoard();
+      if(bestTile>=2048&&!won){won=true;gameActive=false;finishGame();}
+      else if(!canMove()){gameActive=false;finishGame();}
+    }
+
+    function finishGame(){
+      var m=getCurMult();
+      if(m>0){
+        var wa=(bet*m).toFixed(2);
+        resEl.className='result win';resEl.textContent='🎉 Best '+bestTile+' — WIN $'+wa+'!';
+        setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);
+      } else {
+        resEl.className='result loss';resEl.textContent='Best tile: '+bestTile+' — need 256 to win!';
+        setStat('');busy=false;goBtn.disabled=false;
+      }
+    }
+
+    document.addEventListener('keydown',function(e){
+      if(!gameActive)return;
+      var map={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+      if(map[e.key]){e.preventDefault();doMove(map[e.key]);}
+    });
+    var tx=0,ty=0;
+    boardEl.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;ty=e.touches[0].clientY;e.preventDefault();},{passive:false});
+    boardEl.addEventListener('touchend',function(e){
+      var dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+      if(Math.abs(dx)>Math.abs(dy))doMove(dx>0?'right':'left');else doMove(dy>0?'down':'up');
+      e.preventDefault();
+    },{passive:false});
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';setStat('Placing bet…');
+      newGrid();renderBoard();
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='START GAME';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){updBal(d.balance,cur);gameActive=true;setStat('Use arrow keys or swipe to play!');});
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);gameActive=false;busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

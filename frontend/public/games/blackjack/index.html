@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blackjack</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a1a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 12px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: rgba(0,0,0,.4); border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .table { background: #0d2010; border: 2px solid #1a4020; border-radius: 18px; padding: 22px 18px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
+    .hand-area { min-height: 90px; }
+    .hand-lbl { font-size: 10px; color: #4b7a5b; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .hand-lbl .score { color: #fff; font-weight: 700; font-size: 14px; }
+    .cards { display: flex; gap: 8px; flex-wrap: wrap; }
+    .card { width: 52px; height: 72px; background: #fff; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; padding: 5px; font-size: 14px; font-weight: 800; box-shadow: 0 3px 10px rgba(0,0,0,.5); }
+    .card .top { font-size: 13px; line-height: 1; }
+    .card .mid { text-align: center; font-size: 22px; line-height: 1; }
+    .card .bot { font-size: 13px; line-height: 1; text-align: right; transform: rotate(180deg); }
+    .card.red .top, .card.red .bot, .card.red .mid { color: #dc2626; }
+    .card.black .top, .card.black .bot, .card.black .mid { color: #111; }
+    .card.back { background: #1e3a8a; color: #1e3a8a; }
+    .card.back .top, .card.back .bot { font-size: 20px; color: transparent; }
+    .card.back .mid { font-size: 28px; color: rgba(255,255,255,.15); }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,.05); }
+    .actions { display: flex; gap: 8px; }
+    .act-btn { flex: 1; padding: 12px; background: #1a3520; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; color: #6b7280; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .15s; }
+    .act-btn.hit { border-color: rgba(16,185,129,.3); color: #10b981; }
+    .act-btn.hit:hover:not(:disabled) { background: rgba(16,185,129,.1); }
+    .act-btn.stand { border-color: rgba(245,158,11,.3); color: #f59e0b; }
+    .act-btn.stand:hover:not(:disabled) { background: rgba(245,158,11,.1); }
+    .act-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .result { font-size: 18px; font-weight: 800; min-height: 28px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #ef4444; } .result.push { color: #f59e0b; }
+    .row-lbl { font-size: 10px; color: #4b7a5b; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; }
+    .b-btn { flex: 1; padding: 8px 0; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🃏 Blackjack</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="table">
+    <div class="hand-area">
+      <div class="hand-lbl"><span>Dealer</span><span class="score" id="dscore"></span></div>
+      <div class="cards" id="dcards"></div>
+    </div>
+    <hr class="divider">
+    <div class="hand-area">
+      <div class="hand-lbl"><span>You</span><span class="score" id="pscore"></span></div>
+      <div class="cards" id="pcards"></div>
+    </div>
+    <div class="actions">
+      <button class="act-btn hit" id="hitBtn" disabled>HIT</button>
+      <button class="act-btn stand" id="standBtn" disabled>STAND</button>
+    </div>
+    <div class="result" id="res"></div>
+    <div>
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+  </div>
+  <script>
+    var RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+    var SUITS=[{sym:'♠',red:false},{sym:'♥',red:true},{sym:'♦',red:true},{sym:'♣',red:false}];
+    var bet=1, busy=false, rid=null, cur='USD';
+    var deck=[], playerHand=[], dealerHand=[], gameActive=false;
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var statEl=document.getElementById('stat'), goBtn=document.getElementById('go');
+    var hitBtn=document.getElementById('hitBtn'), standBtn=document.getElementById('standBtn');
+    var pcardsEl=document.getElementById('pcards'), dcardsEl=document.getElementById('dcards');
+    var pscoreEl=document.getElementById('pscore'), dscoreEl=document.getElementById('dscore');
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+
+    function buildDeck(){
+      deck=[];
+      for(var s=0;s<4;s++) for(var r=0;r<13;r++) deck.push({rank:RANKS[r],suit:SUITS[s]});
+      // shuffle
+      for(var i=deck.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=deck[i];deck[i]=deck[j];deck[j]=t;}
+    }
+
+    function cardValue(card){
+      if(card.rank==='A') return 11;
+      if(['J','Q','K'].indexOf(card.rank)>=0) return 10;
+      return parseInt(card.rank);
+    }
+
+    function handScore(hand){
+      var total=0, aces=0;
+      hand.forEach(function(c){var v=cardValue(c);if(c.rank==='A')aces++;total+=v;});
+      while(total>21&&aces>0){total-=10;aces--;}
+      return total;
+    }
+
+    function renderCard(c, hidden){
+      var div=document.createElement('div');
+      if(hidden){div.className='card back';div.innerHTML='<div class="top"></div><div class="mid">🂠</div><div class="bot"></div>';return div;}
+      div.className='card '+(c.suit.red?'red':'black');
+      div.innerHTML='<div class="top">'+c.rank+c.suit.sym+'</div><div class="mid">'+c.suit.sym+'</div><div class="bot">'+c.rank+c.suit.sym+'</div>';
+      return div;
+    }
+
+    function renderHands(showDealer){
+      pcardsEl.innerHTML='';dcardsEl.innerHTML='';
+      playerHand.forEach(function(c){pcardsEl.appendChild(renderCard(c,false));});
+      dealerHand.forEach(function(c,i){dcardsEl.appendChild(renderCard(c,!showDealer&&i===1));});
+      pscoreEl.textContent=handScore(playerHand);
+      dscoreEl.textContent=showDealer?handScore(dealerHand):(cardValue(dealerHand[0])+'+?');
+    }
+
+    function deal(){
+      buildDeck();
+      playerHand=[deck.pop(),deck.pop()];
+      dealerHand=[deck.pop(),deck.pop()];
+    }
+
+    function endRound(outcome){
+      gameActive=false;hitBtn.disabled=true;standBtn.disabled=true;
+      renderHands(true);
+      var ps=handScore(playerHand), ds=handScore(dealerHand);
+      var isNatural=playerHand.length===2&&ps===21;
+      var msg='';
+      var wa='0';
+      if(outcome==='bust'){msg='💥 Bust! You lose.';resEl.className='result loss';}
+      else if(outcome==='dealer_bust'){msg='🎉 Dealer busts! WIN $'+(bet*2).toFixed(2)+'!';resEl.className='result win';wa=(bet*2).toFixed(2);}
+      else if(outcome==='win'){var m=isNatural?2.5:2;msg='🎉 '+(isNatural?'Blackjack! ':'')+'WIN $'+(bet*m).toFixed(2)+'!';resEl.className='result win';wa=(bet*m).toFixed(2);}
+      else if(outcome==='push'){msg='🤝 Push — bet returned.';resEl.className='result push';wa=(bet).toFixed(2);}
+      else{msg='Dealer wins — you lose.';resEl.className='result loss';}
+      if(parseFloat(wa)>0){setStat('Crediting…');window.GameBridge.reportWin(rid,wa);}
+      else{setStat('');busy=false;goBtn.disabled=false;}
+      resEl.textContent=msg;
+    }
+
+    function dealerPlay(){
+      renderHands(true);
+      var ds=handScore(dealerHand);
+      if(ds<17){dealerHand.push(deck.pop());setTimeout(dealerPlay,500);}
+      else{
+        var ps=handScore(playerHand);
+        ds=handScore(dealerHand);
+        if(ds>21) endRound('dealer_bust');
+        else if(ps>ds) endRound('win');
+        else if(ps===ds) endRound('push');
+        else endRound('lose');
+      }
+    }
+
+    hitBtn.addEventListener('click',function(){
+      if(!gameActive) return;
+      playerHand.push(deck.pop());
+      renderHands(false);
+      var ps=handScore(playerHand);
+      if(ps>21) endRound('bust');
+      else if(ps===21){hitBtn.disabled=true;setTimeout(function(){dealerPlay();},400);}
+    });
+
+    standBtn.addEventListener('click',function(){
+      if(!gameActive) return;
+      hitBtn.disabled=true;standBtn.disabled=true;
+      setTimeout(dealerPlay,400);
+    });
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';
+      pcardsEl.innerHTML='';dcardsEl.innerHTML='';pscoreEl.textContent='';dscoreEl.textContent='';
+      setStat('Dealing…');
+      deal();
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='DEAL';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);
+        renderHands(false);
+        var ps=handScore(playerHand);
+        if(ps===21){setStat('Blackjack!');setTimeout(function(){dealerPlay();},800);}
+        else{gameActive=true;hitBtn.disabled=false;standBtn.disabled=false;setStat('Hit or Stand?');}
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);gameActive=false;hitBtn.disabled=true;standBtn.disabled=true;busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

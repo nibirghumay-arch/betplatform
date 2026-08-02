@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lucky Sevens</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f0f;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      gap: 18px;
+    }
+    h1 { font-size: 1.9rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 30px rgba(245,158,11,0.4); }
+
+    .balance-box {
+      background: #1a1a1a;
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 12px;
+      padding: 10px 36px;
+      text-align: center;
+    }
+    .balance-box .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .balance-box .val { font-size: 26px; font-weight: 700; color: #f59e0b; }
+
+    .machine {
+      background: #141414;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 26px 22px;
+      width: 100%;
+      max-width: 370px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .reels { display: flex; gap: 10px; justify-content: center; }
+    .reel {
+      width: 94px; height: 94px;
+      background: #0a0a0a;
+      border: 2px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 46px;
+      user-select: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .reel.spinning { animation: blur-pulse 0.09s infinite alternate; }
+    @keyframes blur-pulse {
+      from { transform: scaleY(0.9); filter: blur(2px); opacity: 0.65; }
+      to   { transform: scaleY(1.06); filter: blur(3px); opacity: 1; }
+    }
+    .reel.lit {
+      border-color: #f59e0b;
+      box-shadow: 0 0 18px rgba(245,158,11,0.5), inset 0 0 10px rgba(245,158,11,0.08);
+    }
+
+    .result { text-align: center; min-height: 26px; font-size: 16px; font-weight: 600; }
+    .result.win  { color: #10b981; }
+    .result.loss { color: #4b5563; }
+
+    .bet-row .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; margin-bottom: 8px; }
+    .bet-btns { display: flex; gap: 8px; }
+    .bet-btn {
+      flex: 1; padding: 9px 0;
+      background: #1f1f1f;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 9px;
+      color: #9ca3af; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .bet-btn:hover { border-color: rgba(245,158,11,0.35); color: #fff; }
+    .bet-btn.active { background: rgba(245,158,11,0.12); border-color: #f59e0b; color: #f59e0b; }
+
+    .spin-btn {
+      width: 100%; padding: 15px;
+      background: #f59e0b; border: none; border-radius: 12px;
+      color: #000; font-size: 17px; font-weight: 800;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+    }
+    .spin-btn:hover:not(:disabled) { background: #fbbf24; transform: translateY(-1px); }
+    .spin-btn:disabled { background: #252525; color: #4b5563; cursor: not-allowed; transform: none; }
+
+    .status { text-align: center; font-size: 11px; color: #374151; min-height: 16px; }
+    .status.err { color: #ef4444; }
+
+    .paytable {
+      width: 100%; max-width: 370px;
+      background: #111; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 12px 16px;
+    }
+    .pt-title { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; margin-bottom: 10px; }
+    .pt-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 13px; }
+    .pt-row .m { color: #f59e0b; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>🎰 Lucky Sevens</h1>
+
+  <div class="balance-box">
+    <div class="lbl">Balance</div>
+    <div class="val" id="balance">—</div>
+  </div>
+
+  <div class="machine">
+    <div class="reels">
+      <div class="reel" id="r0">🍒</div>
+      <div class="reel" id="r1">🍋</div>
+      <div class="reel" id="r2">🍊</div>
+    </div>
+
+    <div class="result" id="result"></div>
+
+    <div class="bet-row">
+      <div class="lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="bet-btn active" data-v="1">$1</button>
+        <button class="bet-btn" data-v="5">$5</button>
+        <button class="bet-btn" data-v="10">$10</button>
+        <button class="bet-btn" data-v="25">$25</button>
+      </div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn" disabled>Connecting…</button>
+    <div class="status" id="status">Connecting to platform…</div>
+  </div>
+
+  <div class="paytable">
+    <div class="pt-title">Paytable — 3 of a Kind</div>
+    <div class="pt-row"><span>🍒🍒🍒</span><span class="m">×2</span></div>
+    <div class="pt-row"><span>🍋🍋🍋</span><span class="m">×3</span></div>
+    <div class="pt-row"><span>🍊🍊🍊</span><span class="m">×4</span></div>
+    <div class="pt-row"><span>🍇🍇🍇</span><span class="m">×5</span></div>
+    <div class="pt-row"><span>⭐⭐⭐</span><span class="m">×10</span></div>
+    <div class="pt-row"><span>7️⃣7️⃣7️⃣</span><span class="m">×25 JACKPOT</span></div>
+  </div>
+
+  <script>
+    var SYMBOLS = ['🍒','🍋','🍊','🍇','⭐','7️⃣'];
+    var WEIGHTS  = [32, 26, 19, 13, 7, 3];
+    var MULTIS   = {'🍒':2,'🍋':3,'🍊':4,'🍇':5,'⭐':10,'7️⃣':25};
+
+    var bet = 1, spinning = false, currentRoundId = null, pendingOutcome = null, currency = 'USD';
+    var spinTimer = null;
+
+    var reels   = [0,1,2].map(function(i){ return document.getElementById('r'+i); });
+    var spinBtn = document.getElementById('spinBtn');
+    var balEl   = document.getElementById('balance');
+    var resEl   = document.getElementById('result');
+    var statEl  = document.getElementById('status');
+
+    function setStatus(msg, err) {
+      statEl.textContent = msg || '';
+      statEl.className = 'status' + (err ? ' err' : '');
+    }
+
+    function updateBalance(val, cur) {
+      if (cur) currency = cur;
+      var n = parseFloat(val);
+      balEl.textContent = currency + ' ' + (isNaN(n) ? '—' : n.toFixed(2));
+    }
+
+    function pickSymbol() {
+      var total = WEIGHTS.reduce(function(a,b){ return a+b; }, 0);
+      var r = Math.random() * total;
+      for (var i = 0; i < SYMBOLS.length; i++) { r -= WEIGHTS[i]; if (r <= 0) return SYMBOLS[i]; }
+      return SYMBOLS[0];
+    }
+
+    function startSpin() {
+      reels.forEach(function(r){ r.classList.add('spinning'); r.classList.remove('lit'); });
+      resEl.className = 'result';
+      resEl.textContent = '';
+      clearInterval(spinTimer);
+      spinTimer = setInterval(function(){
+        reels.forEach(function(r){ r.textContent = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]; });
+      }, 80);
+    }
+
+    function stopSpin(symbols, isWin) {
+      clearInterval(spinTimer);
+      reels.forEach(function(r, i){
+        r.classList.remove('spinning');
+        r.textContent = symbols[i];
+        if (isWin) { (function(el){ setTimeout(function(){ el.classList.add('lit'); }, i * 120); })(r); }
+      });
+    }
+
+    document.querySelectorAll('.bet-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (spinning) return;
+        bet = parseInt(btn.getAttribute('data-v'));
+        document.querySelectorAll('.bet-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+      });
+    });
+
+    spinBtn.addEventListener('click', function() {
+      if (spinning || !window.GameBridge) return;
+      var s = [pickSymbol(), pickSymbol(), pickSymbol()];
+      var isWin = s[0] === s[1] && s[1] === s[2];
+      pendingOutcome = { symbols: s, isWin: isWin, winAmt: isWin ? (bet * MULTIS[s[0]]).toFixed(2) : '0.00' };
+      spinning = true;
+      spinBtn.disabled = true;
+      setStatus('');
+      startSpin();
+      try {
+        currentRoundId = window.GameBridge.placeBet(bet);
+        setStatus('Waiting for confirmation…');
+      } catch(e) {
+        stopSpin(['❓','❓','❓'], false);
+        setStatus('Error: ' + e.message, true);
+        spinning = false; spinBtn.disabled = false; pendingOutcome = null;
+      }
+    });
+
+    function initBridge() {
+      spinBtn.textContent = 'SPIN';
+      spinBtn.disabled = false;
+      setStatus('');
+
+      window.GameBridge.on('balance', function(d) { updateBalance(d.balance, d.currency); });
+
+      window.GameBridge.on('bet:confirmed', function(d) {
+        if (!pendingOutcome) return;
+        var out = pendingOutcome; pendingOutcome = null;
+        stopSpin(out.symbols, out.isWin);
+        updateBalance(d.balance, currency);
+        if (out.isWin) {
+          resEl.className = 'result win';
+          resEl.textContent = '🎉 You win $' + out.winAmt + '!';
+          setStatus('Crediting win…');
+          window.GameBridge.reportWin(currentRoundId, out.winAmt);
+        } else {
+          resEl.className = 'result loss';
+          resEl.textContent = 'No match — spin again!';
+          spinning = false; spinBtn.disabled = false;
+        }
+      });
+
+      window.GameBridge.on('win:confirmed', function(d) {
+        updateBalance(d.balance, currency);
+        setStatus('');
+        spinning = false; spinBtn.disabled = false;
+      });
+
+      window.GameBridge.on('error', function(d) {
+        clearInterval(spinTimer);
+        reels.forEach(function(r){ r.classList.remove('spinning'); });
+        setStatus('Error: ' + d.message, true);
+        spinning = false; spinBtn.disabled = false; pendingOutcome = null;
+      });
+
+      window.GameBridge.requestBalance();
+    }
+
+    if (window.GameBridge) { initBridge(); }
+    else { window.addEventListener('game:init', initBridge); }
+  </script>
+</body>
+</html>

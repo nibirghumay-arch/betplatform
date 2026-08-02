@@ -1,0 +1,627 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  PLAYER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum WalletType {
+  USER
+  SYSTEM
+  HOUSE
+  BONUS_POOL
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  BET
+  WIN
+  REFUND
+  BONUS_CREDIT
+  BONUS_DEBIT
+  MANUAL_CREDIT
+  MANUAL_DEBIT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum GameSessionStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+// ─── Phase 5 Enums ────────────────────────────────────────────────────────────
+
+enum ReferralRewardStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum BonusType {
+  WELCOME
+  DEPOSIT
+  REFERRAL
+  PROMOTION
+  VIP_TIER
+  CASHBACK
+}
+
+enum BonusStatus {
+  PENDING_CLAIM
+  ACTIVE
+  WAGERING
+  COMPLETED
+  FORFEITED
+  EXPIRED
+  CANCELLED
+}
+
+// ─── Phase 1 Models ───────────────────────────────────────────────────────────
+
+model User {
+  id               String         @id @default(cuid())
+  email            String         @unique
+  username         String         @unique
+  passwordHash     String         @map("password_hash")
+  role             UserRole       @default(PLAYER)
+  isActive         Boolean        @default(true) @map("is_active")
+  kycVerified      Boolean        @default(false) @map("kyc_verified")
+  emailVerifiedAt  DateTime?      @map("email_verified_at")
+  referralCode     String?        @unique @map("referral_code")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  wallet           Wallet?
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  deposits         Deposit[]
+  withdrawals      Withdrawal[]
+  referralsGiven   Referral[]     @relation("referrerReferrals")
+  referralReceived Referral?      @relation("referredReferral")
+  referralRewards  ReferralReward[]
+  vipProgress      VipProgress?
+  bonuses                  Bonus[]
+  bonusClaims              BonusClaim[]
+  notifications            Notification[]
+  notificationPreference   NotificationPreference?
+  paymentMethods           PaymentMethod[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  before     Json?
+  after      Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ─── Phase 2 Models ───────────────────────────────────────────────────────────
+
+// No `balance` column — balance is always derived from SUM of ledger_entries.
+model Wallet {
+  id            String        @id @default(cuid())
+  userId        String?       @unique @map("user_id")
+  walletType    WalletType    @default(USER) @map("wallet_type")
+  currency      String        @default("USD")
+  isActive      Boolean       @default(true) @map("is_active")
+  isFrozen      Boolean       @default(false) @map("is_frozen")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  user          User?         @relation(fields: [userId], references: [id])
+  ledgerEntries LedgerEntry[]
+
+  @@index([walletType, currency])
+  @@map("wallets")
+}
+
+// Immutable — never update or delete rows.
+// Double-entry: every Transaction has exactly one DEBIT and one CREDIT entry.
+model LedgerEntry {
+  id            String      @id @default(cuid())
+  walletId      String      @map("wallet_id")
+  transactionId String      @map("transaction_id")
+  entryType     EntryType   @map("entry_type")
+  amount        Decimal     @db.Decimal(18, 8)
+  currency      String      @default("USD")
+  description   String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  wallet        Wallet      @relation(fields: [walletId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+model Transaction {
+  id            String            @id @default(cuid())
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  amount        Decimal           @db.Decimal(18, 8)
+  currency      String            @default("USD")
+  // Idempotency key — unique per external payment/event reference.
+  reference     String?           @unique
+  description   String?
+  metadata      Json?
+  gameRoundId   String?           @map("game_round_id")
+  initiatedBy   String?           @map("initiated_by")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  ledgerEntries   LedgerEntry[]
+  deposit         Deposit?
+  withdrawal      Withdrawal?
+  referralReward  ReferralReward?
+  bonus           Bonus?
+
+  @@index([type, status])
+  @@index([gameRoundId])
+  @@index([initiatedBy])
+  @@map("transactions")
+}
+
+// ─── Phase 4 Enums ────────────────────────────────────────────────────────────
+
+enum DepositStatus {
+  PENDING_PAYMENT
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WithdrawalStatus {
+  PENDING_KYC
+  PENDING_REVIEW
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+// Mobile financial services + cards supported through the SSLCommerz gateway.
+// BANK / CARD are kept for completeness (SSLCommerz also routes cards & net-banking).
+enum PaymentMethodType {
+  BKASH
+  NAGAD
+  ROCKET
+  UPAY
+  MCASH
+  TAP
+  BANK
+  CARD
+}
+
+// ─── Phase 3 Models ───────────────────────────────────────────────────────────
+
+model GameCategory {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  sortOrder   Int              @default(0) @map("sort_order")
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  games       GameDefinition[]
+
+  @@map("game_categories")
+}
+
+model GameDefinition {
+  id           String          @id @default(cuid())
+  providerId   String          @map("provider_id")
+  externalId   String          @unique @map("external_id")
+  name         String
+  slug         String          @unique
+  categoryId   String          @map("category_id")
+  description  String?
+  thumbnailUrl String?         @map("thumbnail_url")
+  // Relative path (e.g. "slots/demo") or absolute URL served by the HTML5 game host.
+  gameUrl      String          @map("game_url")
+  rtp          Decimal?        @db.Decimal(5, 2)
+  isActive     Boolean         @default(true) @map("is_active")
+  metadata     Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  category     GameCategory    @relation(fields: [categoryId], references: [id])
+  sessions     GameSession[]
+
+  @@index([providerId, isActive])
+  @@index([categoryId])
+  @@map("game_definitions")
+}
+
+model GameSession {
+  id         String            @id @default(cuid())
+  userId     String            @map("user_id")
+  gameId     String            @map("game_id")
+  providerId String            @map("provider_id")
+  // Opaque token passed to the iframe and used in every postMessage event.
+  token      String            @unique
+  status     GameSessionStatus @default(ACTIVE)
+  currency   String            @default("USD")
+  launchUrl  String?           @map("launch_url")
+  expiresAt  DateTime          @map("expires_at")
+  startedAt  DateTime          @default(now()) @map("started_at")
+  endedAt    DateTime?         @map("ended_at")
+  metadata   Json?
+  game       GameDefinition    @relation(fields: [gameId], references: [id])
+
+  @@index([userId, status])
+  @@index([token])
+  @@index([gameId])
+  @@map("game_sessions")
+}
+
+// ─── Phase 4 Models ───────────────────────────────────────────────────────────
+
+model Deposit {
+  id            String        @id @default(cuid())
+  userId        String        @map("user_id")
+  amount        Decimal       @db.Decimal(18, 8)
+  currency      String        @default("USD")
+  status        DepositStatus @default(PENDING_PAYMENT)
+  pspProvider   String        @map("psp_provider")
+  // PSP checkout session ID returned when initiating payment.
+  pspSessionId  String?       @map("psp_session_id")
+  // PSP payment reference received via webhook — unique once set.
+  pspReference  String?       @unique @map("psp_reference")
+  // PSP-confirmed amount (may differ from requested in edge cases).
+  pspAmount     Decimal?      @db.Decimal(18, 8) @map("psp_amount")
+  // SSLCommerz val_id — required to call the Order Validation API and to
+  // query/refund the transaction later. Null for other providers.
+  sslValId      String?       @map("ssl_val_id")
+  // e.g. "bKash", "Nagad", "Visa", "Internet Banking" — from SSLCommerz's
+  // card_type / card_issuer fields, kept for the user's transaction history.
+  paymentChannel String?      @map("payment_channel")
+  transactionId String?       @unique @map("transaction_id")
+  metadata      Json?
+  failureReason String?       @map("failure_reason")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  user          User          @relation(fields: [userId], references: [id])
+  transaction   Transaction?  @relation(fields: [transactionId], references: [id])
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("deposits")
+}
+
+model Withdrawal {
+  id              String           @id @default(cuid())
+  userId          String           @map("user_id")
+  amount          Decimal          @db.Decimal(18, 8)
+  currency        String           @default("USD")
+  status          WithdrawalStatus @default(PENDING_KYC)
+  pspProvider     String           @map("psp_provider")
+  // PSP payout ID assigned when we initiate the payout (on admin approval).
+  pspPayoutId     String?          @unique @map("psp_payout_id")
+  // PSP settlement reference received via webhook.
+  pspReference    String?          @map("psp_reference")
+  // Bank/crypto payout details — encrypt at rest in production.
+  payoutDetails   Json             @map("payout_details")
+  // Saved mobile wallet / bank / card the payout should be sent to.
+  // Optional so existing rows and non-mobile-wallet flows still work.
+  paymentMethodId String?          @map("payment_method_id")
+  reviewedBy      String?          @map("reviewed_by")
+  reviewedAt      DateTime?        @map("reviewed_at")
+  rejectionReason String?          @map("rejection_reason")
+  transactionId   String?          @unique @map("transaction_id")
+  metadata        Json?
+  failureReason   String?          @map("failure_reason")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  user            User             @relation(fields: [userId], references: [id])
+  transaction     Transaction?     @relation(fields: [transactionId], references: [id])
+  paymentMethod   PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([pspPayoutId])
+  @@map("withdrawals")
+}
+
+// A saved payout/deposit destination — bKash, Nagad, Rocket, Upay, mCash, Tap,
+// bank account, or card. A user may save several; exactly one is `isDefault`
+// per user at any time (enforced in PaymentMethodService, not the DB, since
+// most DBs can't express a "partial unique" constraint portably via Prisma).
+// The active/default one is what withdrawals use unless the user picks another
+// at request time.
+model PaymentMethod {
+  id              String            @id @default(cuid())
+  userId          String            @map("user_id")
+  type            PaymentMethodType
+  // Mobile wallet number (bKash/Nagad/Rocket/Upay/mCash/Tap) or bank account
+  // number / masked card PAN. Never store full card PANs in production —
+  // this field expects a gateway token or masked value for CARD.
+  accountNumber   String            @map("account_number")
+  accountHolder   String?           @map("account_holder")
+  // BANK-only fields.
+  bankName        String?           @map("bank_name")
+  branchName      String?           @map("branch_name")
+  routingNumber   String?           @map("routing_number")
+  label           String?
+  isDefault       Boolean           @default(false) @map("is_default")
+  isVerified      Boolean           @default(false) @map("is_verified")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawals     Withdrawal[]
+
+  @@index([userId, isDefault])
+  @@index([userId, type])
+  @@map("payment_methods")
+}
+
+// ─── Phase 5 Models ───────────────────────────────────────────────────────────
+
+// Database-driven configuration: all rule thresholds and amounts live here.
+model SystemSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("system_settings")
+}
+
+model Referral {
+  id          String           @id @default(cuid())
+  referrerId  String           @map("referrer_id")
+  referredId  String           @unique @map("referred_id")
+  code        String
+  completedAt DateTime?        @map("completed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  referrer    User             @relation("referrerReferrals", fields: [referrerId], references: [id])
+  referred    User             @relation("referredReferral", fields: [referredId], references: [id])
+  rewards     ReferralReward[]
+
+  @@index([referrerId])
+  @@map("referrals")
+}
+
+model ReferralReward {
+  id            String               @id @default(cuid())
+  referralId    String               @map("referral_id")
+  userId        String               @map("user_id")
+  amount        Decimal              @db.Decimal(18, 8)
+  currency      String               @default("USD")
+  status        ReferralRewardStatus @default(PENDING)
+  rewardType    String               @map("reward_type")
+  transactionId String?              @unique @map("transaction_id")
+  metadata      Json?
+  createdAt     DateTime             @default(now()) @map("created_at")
+  paidAt        DateTime?            @map("paid_at")
+  referral      Referral             @relation(fields: [referralId], references: [id])
+  user          User                 @relation(fields: [userId], references: [id])
+  transaction   Transaction?         @relation(fields: [transactionId], references: [id])
+
+  @@index([referralId])
+  @@index([userId, status])
+  @@map("referral_rewards")
+}
+
+model VipLevel {
+  id           String        @id @default(cuid())
+  tier         Int           @unique
+  name         String
+  minWagerUsd  Decimal       @db.Decimal(18, 2) @map("min_wager_usd")
+  bonusAmount  Decimal       @db.Decimal(18, 2) @map("bonus_amount")
+  cashbackRate Decimal       @db.Decimal(5, 4) @map("cashback_rate")
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  progress     VipProgress[]
+
+  @@map("vip_levels")
+}
+
+model VipProgress {
+  id             String    @id @default(cuid())
+  userId         String    @unique @map("user_id")
+  currentTier    Int       @default(0) @map("current_tier")
+  totalWagerUsd  Decimal   @db.Decimal(18, 2) @default(0) @map("total_wager_usd")
+  periodWagerUsd Decimal   @db.Decimal(18, 2) @default(0) @map("period_wager_usd")
+  lastPromotedAt DateTime? @map("last_promoted_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  user           User      @relation(fields: [userId], references: [id])
+  vipLevel       VipLevel? @relation(fields: [currentTier], references: [tier])
+
+  @@map("vip_progress")
+}
+
+model BonusRule {
+  id               String     @id @default(cuid())
+  name             String
+  bonusType        BonusType  @map("bonus_type")
+  isActive         Boolean    @default(true) @map("is_active")
+  triggerEvent     String     @map("trigger_event")
+  // JSON config: { amount?, matchPercent?, maxAmount?, wageringMultiplier, expiryDays?, currency? }
+  config           Json
+  priority         Int        @default(0)
+  startsAt         DateTime?  @map("starts_at")
+  endsAt           DateTime?  @map("ends_at")
+  maxClaimsPerUser Int?       @map("max_claims_per_user")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  bonuses          Bonus[]
+  claims           BonusClaim[]
+
+  @@index([triggerEvent, isActive])
+  @@map("bonus_rules")
+}
+
+model Bonus {
+  id                  String      @id @default(cuid())
+  userId              String      @map("user_id")
+  bonusRuleId         String?     @map("bonus_rule_id")
+  bonusType           BonusType   @map("bonus_type")
+  status              BonusStatus @default(PENDING_CLAIM)
+  amount              Decimal     @db.Decimal(18, 8)
+  currency            String      @default("USD")
+  wageringRequirement Decimal     @db.Decimal(18, 8) @map("wagering_requirement")
+  wageredAmount       Decimal     @db.Decimal(18, 8) @default(0) @map("wagered_amount")
+  transactionId       String?     @unique @map("transaction_id")
+  expiresAt           DateTime?   @map("expires_at")
+  activatedAt         DateTime?   @map("activated_at")
+  completedAt         DateTime?   @map("completed_at")
+  metadata            Json?
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  user                User        @relation(fields: [userId], references: [id])
+  bonusRule           BonusRule?  @relation(fields: [bonusRuleId], references: [id])
+  transaction         Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([userId, status])
+  @@index([expiresAt])
+  @@map("bonuses")
+}
+
+model BonusClaim {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  bonusRuleId String    @map("bonus_rule_id")
+  bonusId     String?   @map("bonus_id")
+  claimedAt   DateTime  @default(now()) @map("claimed_at")
+  user        User      @relation(fields: [userId], references: [id])
+  bonusRule   BonusRule @relation(fields: [bonusRuleId], references: [id])
+
+  @@index([userId, bonusRuleId])
+  @@map("bonus_claims")
+}
+
+// ─── Phase 6 Enums ────────────────────────────────────────────────────────────
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  DISMISSED
+}
+
+enum ReportJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReportType {
+  REVENUE
+  PLAYER
+  GAME
+}
+
+// ─── Phase 6 Models ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String             @id @default(cuid())
+  userId    String             @map("user_id")
+  type      String
+  title     String
+  body      String
+  status    NotificationStatus @default(UNREAD)
+  metadata  Json?
+  readAt    DateTime?          @map("read_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+  user      User               @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id           String  @id @default(cuid())
+  userId       String  @unique @map("user_id")
+  emailEnabled Boolean @default(true) @map("email_enabled")
+  inAppEnabled Boolean @default(true) @map("in_app_enabled")
+  // JSON map of notification type → bool override
+  typeOverrides Json   @default("{}") @map("type_overrides")
+  user          User   @relation(fields: [userId], references: [id])
+
+  @@map("notification_preferences")
+}
+
+model ReportJob {
+  id          String          @id @default(cuid())
+  reportType  ReportType      @map("report_type")
+  status      ReportJobStatus @default(QUEUED)
+  requestedBy String          @map("requested_by")
+  params      Json
+  resultUrl   String?         @map("result_url")
+  errorMsg    String?         @map("error_msg")
+  startedAt   DateTime?       @map("started_at")
+  completedAt DateTime?       @map("completed_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  @@index([requestedBy])
+  @@index([status, createdAt])
+  @@map("report_jobs")
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(cuid())
+  snapshotDate    DateTime @unique @map("snapshot_date") @db.Date
+  totalPlayers    Int      @map("total_players")
+  activePlayers   Int      @map("active_players")
+  newPlayers      Int      @map("new_players")
+  ggr             Decimal  @db.Decimal(18, 2)
+  totalDeposits   Decimal  @db.Decimal(18, 2) @map("total_deposits")
+  totalWithdrawals Decimal @db.Decimal(18, 2) @map("total_withdrawals")
+  totalBets       Int      @map("total_bets")
+  activeSessions  Int      @map("active_sessions")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("analytics_snapshots")
+}
+

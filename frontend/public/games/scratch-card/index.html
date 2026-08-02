@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scratch Card</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 14px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 24px 20px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+    .scratch-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    .cell { aspect-ratio: 1; background: #1a1a1a; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 36px; cursor: pointer; position: relative; overflow: hidden; transition: transform .1s; user-select: none; }
+    .cell:hover:not(.revealed) { transform: scale(1.04); border-color: rgba(245,158,11,.3); }
+    .cell .cover { position: absolute; inset: 0; background: linear-gradient(135deg,#2a2a2a,#1a1a1a); border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #6b7280; transition: opacity .25s; }
+    .cell.revealed .cover { opacity: 0; pointer-events: none; }
+    .cell.matched { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,.4); }
+    .result { font-size: 16px; font-weight: 700; min-height: 24px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .progress { font-size: 12px; color: #6b7280; text-align: center; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+    .paytable { background: #0f0f0f; border-radius: 10px; padding: 10px 14px; }
+    .pt-title { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+    .pt-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+    .pt-row .m { color: #f59e0b; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>🎰 Scratch Card</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="card">
+    <div class="scratch-grid" id="grid"></div>
+    <div class="result" id="res"></div>
+    <div class="progress" id="prog">Buy a card to start</div>
+    <div>
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+    <div class="paytable">
+      <div class="pt-title">3 of a Kind Pays</div>
+      <div class="pt-row"><span>💎💎💎</span><span class="m">×10</span></div>
+      <div class="pt-row"><span>💰💰💰</span><span class="m">×5</span></div>
+      <div class="pt-row"><span>⭐⭐⭐</span><span class="m">×3</span></div>
+      <div class="pt-row"><span>🍀🍀🍀</span><span class="m">×2</span></div>
+      <div class="pt-row"><span>🎁🎁🎁</span><span class="m">×1.5</span></div>
+    </div>
+  </div>
+  <script>
+    var SYMBOLS=['💎','💰','⭐','🍀','🎁'];
+    var MULTS={'💎':10,'💰':5,'⭐':3,'🍀':2,'🎁':1.5};
+    var bet=1, busy=false, rid=null, cur='USD';
+    var cardSymbols=[], revealed=0, active=false;
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var progEl=document.getElementById('prog'), statEl=document.getElementById('stat');
+    var goBtn=document.getElementById('go'), gridEl=document.getElementById('grid');
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+
+    function generateCard(){
+      // Weighted symbol pool (less rare symbols more common)
+      var pool=[];
+      for(var i=0;i<3;i++) pool.push('🎁');
+      for(var i=0;i<3;i++) pool.push('🍀');
+      for(var i=0;i<2;i++) pool.push('⭐');
+      pool.push('💰'); pool.push('💎');
+
+      // ~30% chance of triple, otherwise no triples
+      var hasTriple=Math.random()<0.30;
+      var symbols=[];
+      if(hasTriple){
+        var winSym=pool[Math.floor(Math.random()*pool.length)];
+        var positions=[0,1,2,3,4,5,6,7,8].sort(function(){return Math.random()-.5;}).slice(0,3);
+        for(var i=0;i<9;i++) symbols.push('');
+        positions.forEach(function(p){symbols[p]=winSym;});
+        for(var i=0;i<9;i++){
+          if(!symbols[i]){
+            var s; do{s=pool[Math.floor(Math.random()*pool.length)];}while(s===winSym);
+            symbols[i]=s;
+          }
+        }
+      } else {
+        // Ensure no accidental triple
+        var attempts=0;
+        do {
+          symbols=[];
+          for(var i=0;i<9;i++) symbols.push(pool[Math.floor(Math.random()*pool.length)]);
+          attempts++;
+          if(attempts>100) break;
+          var counts={};
+          symbols.forEach(function(s){counts[s]=(counts[s]||0)+1;});
+          var triple=false;
+          for(var k in counts){if(counts[k]>=3){triple=true;break;}}
+        } while(triple);
+      }
+      return symbols;
+    }
+
+    function renderCard(playable){
+      gridEl.innerHTML='';
+      revealed=0;
+      for(var i=0;i<9;i++){
+        (function(idx){
+          var cell=document.createElement('div');
+          cell.className='cell';
+          cell.innerHTML='<div class="cover">🎫</div><span>'+cardSymbols[idx]+'</span>';
+          if(playable){
+            cell.addEventListener('click',function(){
+              if(!active||cell.classList.contains('revealed'))return;
+              cell.classList.add('revealed');
+              revealed++;
+              progEl.textContent=revealed+' / 9 revealed';
+              if(revealed===9) checkWin();
+            });
+          }
+          gridEl.appendChild(cell);
+        })(i);
+      }
+    }
+
+    function checkWin(){
+      active=false;
+      var counts={};
+      cardSymbols.forEach(function(s){counts[s]=(counts[s]||0)+1;});
+      var winSym=null,mult=0;
+      for(var s in counts){if(counts[s]>=3&&MULTS[s]&&MULTS[s]>mult){winSym=s;mult=MULTS[s];}}
+      // Highlight matched cells
+      if(winSym){
+        gridEl.querySelectorAll('.cell').forEach(function(c,i){
+          if(cardSymbols[i]===winSym)c.classList.add('matched');
+        });
+        var wa=(bet*mult).toFixed(2);
+        resEl.className='result win';resEl.textContent='🎉 3× '+winSym+' — WIN $'+wa+'!';
+        setStat('Crediting win…');
+        window.GameBridge.reportWin(rid,wa);
+      } else {
+        resEl.className='result loss';resEl.textContent='No match — try again!';
+        setStat('');busy=false;goBtn.disabled=false;progEl.textContent='Buy a card to start';
+      }
+    }
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';setStat('Buying card…');
+      cardSymbols=generateCard();renderCard(false);
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='BUY CARD';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);active=true;
+        renderCard(true);
+        progEl.textContent='Click tiles to reveal — 0 / 9';setStat('Scratch the card!');
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;progEl.textContent='Buy a card to start';});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);busy=false;goBtn.disabled=false;active=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match 3 Gems</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 16px; gap: 12px; }
+    h1 { font-size: 1.7rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 8px 32px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 22px; font-weight: 700; color: #f59e0b; }
+    .hud { display: flex; gap: 12px; width: 100%; max-width: 380px; }
+    .hud-box { flex: 1; background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 8px; text-align: center; }
+    .hud-box .lbl { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.2px; }
+    .hud-box .val { font-size: 20px; font-weight: 700; color: #fff; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 16px; padding: 16px; width: 100%; max-width: 380px; }
+    .gem-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; }
+    .gem { width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px solid rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .12s; user-select: none; font-size: 18px; font-weight: 800; }
+    .gem:hover { transform: scale(1.08); border-color: rgba(255,255,255,.25); }
+    .gem.sel { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.4); transform: scale(1.1); }
+    .gem.disabled { opacity: .4; cursor: default; pointer-events: none; }
+    .bottom-row { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; }
+    .result { font-size: 15px; font-weight: 700; min-height: 22px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 12px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+    .pt { background: #0f0f0f; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #6b7280; }
+    .pt b { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>💎 Match 3 Gems</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="hud">
+    <div class="hud-box"><div class="lbl">Moves Left</div><div class="val" id="moves">—</div></div>
+    <div class="hud-box"><div class="lbl">Gems Matched</div><div class="val" id="matched">0</div></div>
+    <div class="hud-box"><div class="lbl">Multiplier</div><div class="val" id="mult">—</div></div>
+  </div>
+  <div class="card"><div class="gem-grid" id="grid"></div></div>
+  <div class="bottom-row">
+    <div class="result" id="res"></div>
+    <div>
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+    <div class="pt">Win thresholds: <b>5+</b>=×1.2 · <b>10+</b>=×2.0 · <b>18+</b>=×4.0 · <b>28+</b>=×8.0 · <b>40+</b>=×15</div>
+  </div>
+  <script>
+    var ROWS=7, COLS=7, MOVE_LIMIT=5;
+    var COLORS=['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'];
+    var LABELS=['R','O','Y','G','B'];
+    var WIN_TABLE=[[5,1.2],[10,2.0],[18,4.0],[28,8.0],[40,15]];
+    var bet=1, busy=false, rid=null, cur='USD', active=false;
+    var grid=[], selected=null, movesLeft=0, totalMatched=0;
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var statEl=document.getElementById('stat'), goBtn=document.getElementById('go');
+    var gridEl=document.getElementById('grid'), movesEl=document.getElementById('moves');
+    var matchedEl=document.getElementById('matched'), multEl=document.getElementById('mult');
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+    function getMult(n){var m=0;WIN_TABLE.forEach(function(t){if(n>=t[0])m=t[1];});return m;}
+    function updHud(){movesEl.textContent=movesLeft;matchedEl.textContent=totalMatched;var m=getMult(totalMatched);multEl.textContent=m>0?'×'+m:'—';}
+
+    function initGrid(){
+      grid=[];
+      for(var r=0;r<ROWS;r++){
+        grid[r]=[];
+        for(var c=0;c<COLS;c++){
+          var options=[0,1,2,3,4].filter(function(t){
+            if(c>=2&&grid[r][c-1]===t&&grid[r][c-2]===t)return false;
+            if(r>=2&&grid[r-1][c]===t&&grid[r-2][c]===t)return false;
+            return true;
+          });
+          grid[r][c]=options[Math.floor(Math.random()*options.length)];
+        }
+      }
+    }
+
+    function findMatches(){
+      var m=[];
+      for(var r=0;r<ROWS;r++){m[r]=[];for(var c=0;c<COLS;c++)m[r][c]=false;}
+      for(var r=0;r<ROWS;r++){
+        for(var c=0;c<COLS-2;){
+          var t=grid[r][c],len=1;
+          while(c+len<COLS&&grid[r][c+len]===t)len++;
+          if(len>=3)for(var k=0;k<len;k++)m[r][c+k]=true;
+          c+=len>1?len:1;
+        }
+      }
+      for(var c=0;c<COLS;c++){
+        for(var r=0;r<ROWS-2;){
+          var t=grid[r][c],len=1;
+          while(r+len<ROWS&&grid[r+len][c]===t)len++;
+          if(len>=3)for(var k=0;k<len;k++)m[r+k][c]=true;
+          r+=len>1?len:1;
+        }
+      }
+      return m;
+    }
+
+    function countMatchGrid(m){var n=0;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(m[r][c])n++;return n;}
+
+    function dropFill(m){
+      for(var c=0;c<COLS;c++){
+        var col=[];
+        for(var r=ROWS-1;r>=0;r--)if(!m[r][c])col.push(grid[r][c]);
+        for(var r=ROWS-1;r>=0;r--){grid[r][c]=col.length>0?col.shift():Math.floor(Math.random()*COLORS.length);}
+      }
+    }
+
+    function resolveAll(){
+      var total=0;
+      var m=findMatches();
+      while(countMatchGrid(m)>0){total+=countMatchGrid(m);dropFill(m);m=findMatches();}
+      return total;
+    }
+
+    function renderGrid(playable){
+      gridEl.innerHTML='';
+      for(var r=0;r<ROWS;r++){
+        for(var c=0;c<COLS;c++){
+          (function(row,col){
+            var g=document.createElement('div');
+            g.className='gem'+(playable?'':' disabled');
+            g.style.background=COLORS[grid[row][col]];
+            g.textContent=LABELS[grid[row][col]];
+            g.dataset.r=row; g.dataset.c=col;
+            if(playable){
+              g.addEventListener('click',function(){
+                if(!active||movesLeft<=0)return;
+                var r2=parseInt(g.dataset.r), c2=parseInt(g.dataset.c);
+                if(selected===null){selected=g;g.classList.add('sel');return;}
+                var r1=parseInt(selected.dataset.r), c1=parseInt(selected.dataset.c);
+                selected.classList.remove('sel');
+                if((Math.abs(r1-r2)+Math.abs(c1-c2))===1){
+                  var tmp=grid[r1][c1];grid[r1][c1]=grid[r2][c2];grid[r2][c2]=tmp;
+                  var gained=resolveAll();
+                  totalMatched+=gained;movesLeft--;selected=null;
+                  renderGrid(true);updHud();
+                  if(movesLeft<=0)endRound();
+                } else {
+                  selected=g;g.classList.add('sel');
+                }
+              });
+            }
+            gridEl.appendChild(g);
+          })(r,c);
+        }
+      }
+    }
+
+    function endRound(){
+      active=false;selected=null;renderGrid(false);
+      var m=getMult(totalMatched);
+      if(m>0){
+        var wa=(bet*m).toFixed(2);
+        resEl.className='result win';resEl.textContent='🎉 '+totalMatched+' gems — WIN $'+wa+'!';
+        setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);
+      } else {
+        resEl.className='result loss';resEl.textContent=totalMatched+' gems — need 5+ to win!';
+        setStat('');busy=false;goBtn.disabled=false;
+      }
+    }
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';
+      totalMatched=0;movesLeft=MOVE_LIMIT;selected=null;initGrid();renderGrid(false);updHud();setStat('Placing bet…');
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='PLAY ROUND';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){updBal(d.balance,cur);active=true;renderGrid(true);setStat('Swap gems to match 3+!');});
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);active=false;busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

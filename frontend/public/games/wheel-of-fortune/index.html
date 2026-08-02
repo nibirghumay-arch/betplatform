@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wheel of Fortune</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 14px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 24px 20px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+    .wheel-wrap { position: relative; display: inline-block; }
+    .pointer { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 22px solid #f59e0b; filter: drop-shadow(0 2px 4px rgba(245,158,11,.5)); z-index: 2; }
+    canvas { border-radius: 50%; box-shadow: 0 0 32px rgba(0,0,0,.6); display: block; }
+    .result { font-size: 20px; font-weight: 800; min-height: 30px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; align-self: flex-start; }
+    .bet-btns { display: flex; gap: 7px; width: 100%; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🎡 Wheel of Fortune</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="card">
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="260" height="260"></canvas>
+    </div>
+    <div class="result" id="res"></div>
+    <div style="width:100%">
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+  </div>
+  <script>
+    var SEGMENTS=[
+      {label:'×0',mult:0,color:'#1a1a1a'},
+      {label:'×1',mult:1,color:'#374151'},
+      {label:'×2',mult:2,color:'#2d3a4a'},
+      {label:'×0',mult:0,color:'#1a1a1a'},
+      {label:'×1.5',mult:1.5,color:'#2a3040'},
+      {label:'×3',mult:3,color:'#b45309'},
+      {label:'×0',mult:0,color:'#1a1a1a'},
+      {label:'×1',mult:1,color:'#374151'},
+      {label:'×5',mult:5,color:'#065f46'},
+      {label:'×0',mult:0,color:'#1a1a1a'},
+      {label:'×1.5',mult:1.5,color:'#2a3040'},
+      {label:'×10',mult:10,color:'#7c2d12'}
+    ];
+    var N=SEGMENTS.length, TWO_PI=2*Math.PI;
+    var bet=1, busy=false, rid=null, cur='USD', rotation=0, animFrame=null;
+    var canvas=document.getElementById('wheel'), ctx=canvas.getContext('2d');
+    var balEl=document.getElementById('bal'), resEl=document.getElementById('res');
+    var statEl=document.getElementById('stat'), goBtn=document.getElementById('go');
+    var cx=130, cy=130, r=122;
+
+    function drawWheel(rot){
+      ctx.clearRect(0,0,260,260);
+      var segAng=TWO_PI/N;
+      for(var i=0;i<N;i++){
+        var sa=rot+i*segAng-Math.PI/2, ea=sa+segAng;
+        ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,sa,ea);ctx.closePath();
+        ctx.fillStyle=SEGMENTS[i].color;ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=1.5;ctx.stroke();
+        // label
+        var mid=sa+segAng/2;
+        ctx.save();ctx.translate(cx+(r*.68)*Math.cos(mid),cy+(r*.68)*Math.sin(mid));
+        ctx.rotate(mid+Math.PI/2);ctx.fillStyle='#fff';ctx.font='bold 13px sans-serif';
+        ctx.textAlign='center';ctx.fillText(SEGMENTS[i].label,0,0);ctx.restore();
+      }
+      // center
+      ctx.beginPath();ctx.arc(cx,cy,18,0,TWO_PI);
+      ctx.fillStyle='#0f0f0f';ctx.fill();
+      ctx.strokeStyle='rgba(245,158,11,.4)';ctx.lineWidth=2;ctx.stroke();
+      // outer ring
+      ctx.beginPath();ctx.arc(cx,cy,r,0,TWO_PI);
+      ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=2;ctx.stroke();
+    }
+    drawWheel(0);
+
+    function spinTo(targetRot, callback){
+      var startRot=rotation, totalSpin=targetRot-startRot;
+      var start=null, duration=3200;
+      function easeOut(t){return 1-Math.pow(1-t,4);}
+      function frame(ts){
+        if(!start)start=ts;
+        var t=Math.min((ts-start)/duration,1);
+        rotation=startRot+totalSpin*easeOut(t);
+        drawWheel(rotation);
+        if(t<1)animFrame=requestAnimationFrame(frame);
+        else{rotation=targetRot%TWO_PI;drawWheel(rotation);if(callback)callback();}
+      }
+      animFrame=requestAnimationFrame(frame);
+    }
+
+    function getStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';getStat('Placing bet…');
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){getStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='SPIN';goBtn.disabled=false;getStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);
+        // Weighted random segment (more zeros)
+        var weights=SEGMENTS.map(function(s){return s.mult===0?5:s.mult===1?3:s.mult<=2?2:1;});
+        var total=weights.reduce(function(a,b){return a+b;},0);
+        var rr=Math.random()*total, acc=0, seg=0;
+        for(var i=0;i<N;i++){acc+=weights[i];if(rr<=acc){seg=i;break;}}
+        var segAng=TWO_PI/N;
+        // Target rotation: segment `seg` ends up at top (pointer)
+        // Pointer is at top. Segment `seg` center should be at -PI/2 from canvas center.
+        // We want: rotation + seg*segAng + segAng/2 = -PI/2 + k*2PI
+        var target=-Math.PI/2 - seg*segAng - segAng/2;
+        var spins=6+Math.random()*4; // 6-10 full rotations
+        target+=spins*TWO_PI;
+        getStat('Spinning…');
+        spinTo(rotation+target-rotation,function(){
+          var m=SEGMENTS[seg].mult;
+          if(m>0){var wa=(bet*m).toFixed(2);resEl.className='result win';resEl.textContent='🎉 '+SEGMENTS[seg].label+' — WIN $'+wa+'!';getStat('Crediting win…');window.GameBridge.reportWin(rid,wa);}
+          else{resEl.className='result loss';resEl.textContent='×0 — No win this time!';getStat('');busy=false;goBtn.disabled=false;}
+        });
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);getStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){if(animFrame)cancelAnimationFrame(animFrame);getStat('Error: '+d.message,true);busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

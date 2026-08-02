@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dice Roll</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 14px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 24px 20px; width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+    .dice-area { display: flex; gap: 20px; justify-content: center; align-items: center; }
+    .die { width: 88px; height: 88px; background: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 52px; box-shadow: 0 6px 24px rgba(0,0,0,.6); transition: transform .1s; }
+    .die.rolling { animation: shake .08s infinite alternate; }
+    @keyframes shake { from{transform:rotate(-6deg) scale(1.04)}to{transform:rotate(6deg) scale(0.97)} }
+    .sum-box { text-align: center; }
+    .sum-box .sum { font-size: 36px; font-weight: 800; color: #f59e0b; line-height: 1; }
+    .sum-box .slbl { font-size: 11px; color: #4b5563; margin-top: 4px; }
+    .types { display: flex; gap: 8px; }
+    .t-btn { flex: 1; padding: 10px 4px; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; color: #9ca3af; font-size: 12px; font-weight: 700; cursor: pointer; text-align: center; transition: all .15s; }
+    .t-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .t-btn.sel { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .t-btn .mult { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .t-btn.sel .mult { color: rgba(245,158,11,.7); }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .bet-btns { display: flex; gap: 7px; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .result { font-size: 16px; font-weight: 700; min-height: 24px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🎲 Dice Roll</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="card">
+    <div class="dice-area">
+      <div class="die" id="d1">⚀</div>
+      <div class="die" id="d2">⚀</div>
+    </div>
+    <div class="sum-box">
+      <div class="sum" id="dsum">—</div>
+      <div class="slbl">Total</div>
+    </div>
+    <div class="result" id="res"></div>
+    <div>
+      <div class="row-lbl">Bet On</div>
+      <div class="types">
+        <div class="t-btn sel" data-v="low"><div>LOW</div><div>2 – 6</div><div class="mult">×1.9</div></div>
+        <div class="t-btn" data-v="seven"><div>SEVEN</div><div>7</div><div class="mult">×4.0</div></div>
+        <div class="t-btn" data-v="high"><div>HIGH</div><div>8 – 12</div><div class="mult">×1.9</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+  </div>
+  <script>
+    var DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    var bet=1, betType='low', busy=false, rid=null, cur='USD';
+    var d1=document.getElementById('d1'), d2=document.getElementById('d2');
+    var dsumEl=document.getElementById('dsum'), balEl=document.getElementById('bal');
+    var resEl=document.getElementById('res'), statEl=document.getElementById('stat');
+    var goBtn=document.getElementById('go');
+    var rollTimer=null;
+
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+
+    document.querySelectorAll('.t-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;betType=b.getAttribute('data-v');document.querySelectorAll('.t-btn').forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');});
+    });
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';dsumEl.textContent='—';setStat('Placing bet…');
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+
+    function initBridge(){
+      goBtn.textContent='ROLL';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);
+        var r1=Math.ceil(Math.random()*6), r2=Math.ceil(Math.random()*6), total=r1+r2;
+        var won=(betType==='low'&&total<=6)||(betType==='seven'&&total===7)||(betType==='high'&&total>=8);
+        var mult=betType==='seven'?4.0:1.9;
+        d1.classList.add('rolling');d2.classList.add('rolling');setStat('Rolling…');
+        rollTimer=setInterval(function(){
+          d1.textContent=DICE_FACES[Math.floor(Math.random()*6)];
+          d2.textContent=DICE_FACES[Math.floor(Math.random()*6)];
+        },80);
+        setTimeout(function(){
+          clearInterval(rollTimer);
+          d1.classList.remove('rolling');d2.classList.remove('rolling');
+          d1.textContent=DICE_FACES[r1-1];d2.textContent=DICE_FACES[r2-1];
+          dsumEl.textContent=total;
+          if(won){var wa=(bet*mult).toFixed(2);resEl.className='result win';resEl.textContent='🎉 '+total+' — WIN $'+wa+'!';setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);}
+          else{resEl.className='result loss';resEl.textContent=total+' — No match!';setStat('');busy=false;goBtn.disabled=false;}
+        },700);
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){clearInterval(rollTimer);d1.classList.remove('rolling');d2.classList.remove('rolling');setStat('Error: '+d.message,true);busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>

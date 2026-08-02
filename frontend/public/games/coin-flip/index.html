@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coin Flip</title>
+  <script src="/game-shim.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; gap: 14px; }
+    h1 { font-size: 1.8rem; font-weight: 800; color: #f59e0b; text-shadow: 0 0 24px rgba(245,158,11,0.35); }
+    .bal { background: #1a1a1a; border: 1px solid rgba(245,158,11,.22); border-radius: 12px; padding: 10px 36px; text-align: center; }
+    .bal .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; }
+    .bal .val { font-size: 24px; font-weight: 700; color: #f59e0b; }
+    .card { background: #141414; border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 24px 20px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+    .coin-scene { perspective: 600px; }
+    .coin { width: 110px; height: 110px; position: relative; transform-style: preserve-3d; border-radius: 50%; }
+    .face { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 50px; backface-visibility: hidden; }
+    .face.h { background: linear-gradient(135deg,#f59e0b,#d97706); border: 3px solid rgba(245,158,11,.5); box-shadow: 0 4px 20px rgba(245,158,11,.3); }
+    .face.t { background: linear-gradient(135deg,#6b7280,#4b5563); border: 3px solid rgba(107,114,128,.5); transform: rotateY(180deg); }
+    .coin.spin { animation: coinSpin 0.9s cubic-bezier(0.4,0,0.2,1) forwards; }
+    @keyframes coinSpin { 0%{transform:rotateY(0)} 40%{transform:rotateY(900deg)} 100%{transform:rotateY(var(--end-rot,0deg))} }
+    .choices { display: flex; gap: 10px; width: 100%; }
+    .c-btn { flex: 1; padding: 13px; background: #1f1f1f; border: 2px solid rgba(255,255,255,.08); border-radius: 10px; color: #9ca3af; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .15s; }
+    .c-btn:hover { border-color: rgba(245,158,11,.35); color: #fff; }
+    .c-btn.sel { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .row-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; align-self: flex-start; }
+    .bet-btns { display: flex; gap: 7px; width: 100%; }
+    .b-btn { flex: 1; padding: 8px 0; background: #1f1f1f; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: #9ca3af; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .b-btn:hover { border-color: rgba(245,158,11,.3); color: #fff; }
+    .b-btn.act { background: rgba(245,158,11,.1); border-color: #f59e0b; color: #f59e0b; }
+    .go { width: 100%; padding: 13px; background: #f59e0b; border: none; border-radius: 11px; color: #000; font-size: 15px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .go:hover:not(:disabled) { background: #fbbf24; }
+    .go:disabled { background: #252525; color: #4b5563; cursor: not-allowed; }
+    .result { font-size: 16px; font-weight: 700; min-height: 24px; text-align: center; }
+    .result.win { color: #10b981; } .result.loss { color: #6b7280; }
+    .stat { font-size: 11px; color: #4b5563; min-height: 14px; text-align: center; }
+    .stat.err { color: #ef4444; }
+    .note { font-size: 12px; color: #4b5563; } .note span { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>🪙 Coin Flip</h1>
+  <div class="bal"><div class="lbl">Balance</div><div class="val" id="bal">—</div></div>
+  <div class="card">
+    <div class="coin-scene"><div class="coin" id="coin"><div class="face h">👑</div><div class="face t">🦅</div></div></div>
+    <div class="result" id="res"></div>
+    <div class="choices">
+      <button class="c-btn sel" data-v="HEADS">👑 HEADS</button>
+      <button class="c-btn" data-v="TAILS">🦅 TAILS</button>
+    </div>
+    <div style="width:100%">
+      <div class="row-lbl">Bet Amount</div>
+      <div class="bet-btns">
+        <button class="b-btn act" data-v="1">$1</button>
+        <button class="b-btn" data-v="5">$5</button>
+        <button class="b-btn" data-v="10">$10</button>
+        <button class="b-btn" data-v="25">$25</button>
+      </div>
+    </div>
+    <button class="go" id="go" disabled>Connecting…</button>
+    <div class="stat" id="stat">Connecting to platform…</div>
+    <div class="note">Correct guess pays <span>×1.95</span></div>
+  </div>
+  <script>
+    var bet=1, choice='HEADS', busy=false, rid=null, cur='USD';
+    var coinEl=document.getElementById('coin'), balEl=document.getElementById('bal');
+    var resEl=document.getElementById('res'), statEl=document.getElementById('stat');
+    var goBtn=document.getElementById('go');
+    function setStat(m,e){statEl.textContent=m||'';statEl.className='stat'+(e?' err':'');}
+    function updBal(v,c){if(c)cur=c;var n=parseFloat(v);balEl.textContent=cur+' '+(isNaN(n)?'—':n.toFixed(2));}
+    document.querySelectorAll('.c-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;choice=b.getAttribute('data-v');document.querySelectorAll('.c-btn').forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');});
+    });
+    document.querySelectorAll('.b-btn').forEach(function(b){
+      b.addEventListener('click',function(){if(busy)return;bet=parseInt(b.getAttribute('data-v'));document.querySelectorAll('.b-btn').forEach(function(x){x.classList.remove('act');});b.classList.add('act');});
+    });
+    goBtn.addEventListener('click',function(){
+      if(busy||!window.GameBridge)return;
+      busy=true;goBtn.disabled=true;resEl.className='result';resEl.textContent='';setStat('Placing bet…');
+      try{rid=window.GameBridge.placeBet(bet);}catch(e){setStat('Error: '+e.message,true);busy=false;goBtn.disabled=false;}
+    });
+    function initBridge(){
+      goBtn.textContent='FLIP';goBtn.disabled=false;setStat('');
+      window.GameBridge.on('balance',function(d){updBal(d.balance,d.currency);});
+      window.GameBridge.on('bet:confirmed',function(d){
+        updBal(d.balance,cur);
+        var outcome=Math.random()<0.5?'HEADS':'TAILS', won=outcome===choice;
+        var endRot=outcome==='HEADS'?'0deg':'180deg';
+        coinEl.style.setProperty('--end-rot',endRot);
+        coinEl.classList.remove('spin');void coinEl.offsetWidth;coinEl.classList.add('spin');
+        setTimeout(function(){
+          if(won){var wa=(bet*1.95).toFixed(2);resEl.className='result win';resEl.textContent='🎉 '+outcome+' — WIN $'+wa+'!';setStat('Crediting win…');window.GameBridge.reportWin(rid,wa);}
+          else{resEl.className='result loss';resEl.textContent=outcome+' — Try again!';setStat('');busy=false;goBtn.disabled=false;}
+        },950);
+      });
+      window.GameBridge.on('win:confirmed',function(d){updBal(d.balance,cur);setStat('');busy=false;goBtn.disabled=false;});
+      window.GameBridge.on('error',function(d){setStat('Error: '+d.message,true);busy=false;goBtn.disabled=false;});
+      window.GameBridge.requestBalance();
+    }
+    if(window.GameBridge)initBridge();else window.addEventListener('game:init',initBridge);
+  </script>
+</body>
+</html>
