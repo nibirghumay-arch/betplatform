@@ -6,3 +6,4 @@ dist/
 *.log
 backend/backend.log
 .claude/
+*.tsbuildinfo
