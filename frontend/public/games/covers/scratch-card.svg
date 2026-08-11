@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="80%">
+      <stop offset="0%" stop-color="#3d2810"/>
+      <stop offset="55%" stop-color="#261808"/>
+      <stop offset="100%" stop-color="#130b03"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe9a8"/>
+      <stop offset="100%" stop-color="#c9a15f"/>
+    </linearGradient>
+    <radialGradient id="coin" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#fff2b0"/>
+      <stop offset="45%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#a86a00"/>
+    </radialGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4f0e6"/>
+      <stop offset="100%" stop-color="#9a937f"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="50%" stop-color="#fff6d8"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+
+  <g transform="rotate(-7 300 150)" filter="url(#glow)">
+    <ellipse cx="298" cy="188" rx="58" ry="10" fill="#000" opacity="0.35"/>
+    <circle cx="298" cy="150" r="52" fill="url(#coin)"/>
+    <circle cx="298" cy="150" r="52" fill="none" stroke="#8a5e00" stroke-width="4"/>
+    <circle cx="298" cy="150" r="38" fill="none" stroke="#b8860b" stroke-width="2.5"/>
+    <text x="298" y="164" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="40" fill="#6b4400">$</text>
+    <ellipse cx="282" cy="128" rx="16" ry="10" fill="#ffffff" opacity="0.5" transform="rotate(-25 282 128)"/>
+  </g>
+
+  <g filter="url(#bigglow)" transform="translate(108,138) rotate(6)">
+    <ellipse cx="0" cy="46" rx="96" ry="12" fill="#000" opacity="0.4"/>
+    <rect x="-42" y="-58" width="84" height="112" rx="9" fill="url(#silver)" stroke="#6e6756" stroke-width="2.5"/>
+    <path d="M-30,-46 h60 v-16 c-18,14 -42,14 -60,0 Z" fill="#7d7663"/>
+    <text y="-22" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="34" fill="#3a352a">?</text>
+    <text y="18" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="34" fill="#3a352a">?</text>
+  </g>
+
+  <g filter="url(#glow)">
+    <g transform="translate(178,52)">
+      <text y="0" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="30" fill="#ffd700">WIN</text>
+    </g>
+    <g transform="translate(232,64)">
+      <text y="0" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="30" fill="#ffd700">WIN</text>
+    </g>
+    <g transform="translate(206,100)">
+      <text y="0" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="30" fill="#ffb300">WIN</text>
+    </g>
+  </g>
+
+  <g stroke="#ffd700" stroke-width="2.5" opacity="0.9" filter="url(#glow)">
+    <path d="M48,70 l-5,-9 9,3 4,-8 4,8 9,-3 -5,9 7,7 -9,1 0,9 -7,-5 -7,5 0,-9 -9,-1 Z"/>
+    <path d="M332,206 l-5,-9 9,3 4,-8 4,8 9,-3 -5,9 7,7 -9,1 0,9 -7,-5 -7,5 0,-9 -9,-1 Z"/>
+  </g>
+
+  <text x="200" y="252" font-family="Georgia, serif" font-weight="bold" font-size="26" fill="url(#title)" text-anchor="middle" filter="url(#glow)" letter-spacing="3">SCRATCH CARD</text>
+  <text x="200" y="273" font-family="Arial, sans-serif" font-size="11" fill="#e8c87a" text-anchor="middle" letter-spacing="5">SCRATCH · REVEAL · WIN BIG</text>
+</svg>

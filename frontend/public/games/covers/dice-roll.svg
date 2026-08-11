@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="80%">
+      <stop offset="0%" stop-color="#31141c"/>
+      <stop offset="55%" stop-color="#1e0b12"/>
+      <stop offset="100%" stop-color="#0e0408"/>
+    </radialGradient>
+    <linearGradient id="diew" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d8d2c6"/>
+    </linearGradient>
+    <linearGradient id="dier" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff6a4d"/>
+      <stop offset="100%" stop-color="#b31212"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="50%" stop-color="#fff6d8"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+
+  <g stroke="#ffb300" stroke-width="2.5" opacity="0.9" filter="url(#glow)">
+    <path d="M60,52 l26,-22 l14,30"/>
+    <path d="M340,52 l-26,-22 l-14,30"/>
+    <path d="M200,30 v-22"/>
+  </g>
+  <g stroke="#ff3d3d" stroke-width="2.5" opacity="0.9" filter="url(#glow)">
+    <path d="M60,180 l30,28 l-30,26"/>
+    <path d="M340,180 l-30,28 l30,26"/>
+  </g>
+
+  <g transform="rotate(-12 148 155)" filter="url(#glow)">
+    <rect x="90" y="88" width="116" height="116" rx="22" fill="url(#diew)" stroke="#b9b2a4" stroke-width="3"/>
+    <circle cx="120" cy="118" r="12" fill="#c11a1a"/>
+    <circle cx="176" cy="118" r="12" fill="#c11a1a"/>
+    <circle cx="148" cy="146" r="12" fill="#c11a1a"/>
+    <circle cx="120" cy="174" r="12" fill="#c11a1a"/>
+    <circle cx="176" cy="174" r="12" fill="#c11a1a"/>
+  </g>
+
+  <g transform="rotate(14 252 155)" filter="url(#glow)">
+    <rect x="194" y="88" width="116" height="116" rx="22" fill="url(#dier)" stroke="#8a0a0a" stroke-width="3"/>
+    <circle cx="248" cy="146" r="12" fill="#ffffff"/>
+    <circle cx="220" cy="174" r="12" fill="#ffffff"/>
+    <circle cx="276" cy="118" r="12" fill="#ffffff"/>
+    <circle cx="252" cy="118" r="12" fill="#ffffff" opacity="0.55"/>
+    <circle cx="244" cy="174" r="12" fill="#ffffff" opacity="0.55"/>
+  </g>
+
+  <ellipse cx="200" cy="228" rx="110" ry="14" fill="#ff3d3d" opacity="0.25" filter="url(#bigglow)"/>
+
+  <text x="200" y="255" font-family="Georgia, serif" font-weight="bold" font-size="26" fill="url(#title)" text-anchor="middle" filter="url(#glow)" letter-spacing="3">DICE ROLL</text>
+  <text x="200" y="275" font-family="Arial, sans-serif" font-size="11" fill="#e8a0a0" text-anchor="middle" letter-spacing="5">ROLL HIGH · CHASE THE LUCK</text>
+</svg>

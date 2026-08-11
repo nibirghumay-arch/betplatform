@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#3a2b12"/>
+      <stop offset="55%" stop-color="#241a0a"/>
+      <stop offset="100%" stop-color="#120c04"/>
+    </radialGradient>
+    <radialGradient id="coin" cx="38%" cy="32%" r="75%">
+      <stop offset="0%" stop-color="#fff2b0"/>
+      <stop offset="35%" stop-color="#ffd700"/>
+      <stop offset="70%" stop-color="#f0a500"/>
+      <stop offset="100%" stop-color="#9c6a00"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ff3d00"/>
+      <stop offset="45%" stop-color="#ff9d00"/>
+      <stop offset="100%" stop-color="#ffd54a"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="50%" stop-color="#fff6d8"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+
+  <g stroke="#ffd700" stroke-width="2.5" opacity="0.8" filter="url(#glow)">
+    <line x1="150" y1="60" x2="130" y2="18"/>
+    <line x1="200" y1="52" x2="200" y2="10"/>
+    <line x1="250" y1="60" x2="272" y2="18"/>
+    <line x1="110" y1="98" x2="64" y2="94"/>
+    <line x1="290" y1="98" x2="336" y2="94"/>
+  </g>
+
+  <ellipse cx="95" cy="118" rx="30" ry="8" fill="#000" opacity="0.4"/>
+  <ellipse cx="305" cy="118" rx="30" ry="8" fill="#000" opacity="0.4"/>
+
+  <g filter="url(#bigglow)" transform="translate(200,150)">
+    <circle cx="0" cy="0" r="92" fill="url(#coin)"/>
+    <circle cx="0" cy="0" r="92" fill="none" stroke="#8a5e00" stroke-width="6"/>
+    <circle cx="0" cy="0" r="74" fill="none" stroke="#b8860b" stroke-width="3"/>
+    <circle cx="0" cy="0" r="74" fill="none" stroke="#ffe680" stroke-width="1.5" stroke-dasharray="10 6"/>
+    <circle cx="0" cy="0" r="52" fill="none" stroke="#c99400" stroke-width="4"/>
+    <text y="22" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="56" fill="#6b4400">$</text>
+    <text y="56" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="18" fill="#6b4400" letter-spacing="4">WIN</text>
+  </g>
+
+  <g filter="url(#glow)" opacity="0.95">
+    <g fill="url(#flame)">
+      <path d="M200,232 C212,260 224,268 200,288 C176,268 188,260 200,232 Z"/>
+      <path d="M172,238 C180,258 188,264 176,282 C164,264 168,254 172,238 Z" opacity="0.8"/>
+      <path d="M228,238 C220,258 212,264 224,282 C236,264 232,254 228,238 Z" opacity="0.8"/>
+      <path d="M200,222 C206,240 212,246 200,260 C188,246 194,240 200,222 Z" opacity="0.9"/>
+    </g>
+  </g>
+
+  <text x="200" y="252" font-family="Georgia, serif" font-weight="bold" font-size="26" fill="url(#title)" text-anchor="middle" filter="url(#glow)" letter-spacing="3">COIN FLIP</text>
+  <text x="200" y="273" font-family="Arial, sans-serif" font-size="11" fill="#e8c86a" text-anchor="middle" letter-spacing="5">CALL IT · DOUBLE IT</text>
+</svg>

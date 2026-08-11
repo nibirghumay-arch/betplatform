@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="80%">
+      <stop offset="0%" stop-color="#3a1a3d"/>
+      <stop offset="55%" stop-color="#240f26"/>
+      <stop offset="100%" stop-color="#120612"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffec9e"/>
+      <stop offset="45%" stop-color="#ffcf3d"/>
+      <stop offset="100%" stop-color="#c87f00"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff7a7a"/>
+      <stop offset="100%" stop-color="#c8102e"/>
+    </linearGradient>
+    <linearGradient id="cherry" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff5a6e"/>
+      <stop offset="100%" stop-color="#c81e3a"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffd700"/>
+      <stop offset="50%" stop-color="#fff6d8"/>
+      <stop offset="100%" stop-color="#ffd700"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <ellipse cx="200" cy="216" rx="185" ry="95" fill="#c8102e" opacity="0.12" filter="url(#bigglow)"/>
+
+  <g filter="url(#bigglow)">
+    <text x="200" y="138" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="116" fill="url(#red)">7</text>
+    <text x="250" y="196" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="96" fill="url(#red)" transform="rotate(-8 250 196)">7</text>
+    <text x="152" y="200" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="96" fill="url(#red)" transform="rotate(8 152 200)">7</text>
+  </g>
+
+  <g>
+    <circle cx="52" cy="88" r="14" fill="url(#cherry)"/>
+    <circle cx="70" cy="96" r="14" fill="url(#cherry)"/>
+    <path d="M61,82 C58,60 40,52 26,56 C38,52 54,44 61,30 C66,44 76,58 84,66 C70,60 66,70 61,82 Z" fill="#2e7d32"/>
+    <circle cx="334" cy="200" r="13" fill="url(#cherry)"/>
+    <circle cx="352" cy="208" r="13" fill="url(#cherry)"/>
+    <path d="M343,194 C340,172 322,164 308,168 C320,164 336,156 343,142 C348,156 358,170 366,178 C352,172 348,182 343,194 Z" fill="#2e7d32"/>
+    <circle cx="340" cy="74" r="13" fill="url(#cherry)"/>
+    <circle cx="358" cy="82" r="13" fill="url(#cherry)"/>
+    <path d="M349,68 C346,46 328,38 314,42 C326,38 342,30 349,16 C354,30 364,44 372,52 C358,46 354,56 349,68 Z" fill="#2e7d32"/>
+  </g>
+
+  <g stroke="#ffd700" stroke-width="2" opacity="0.85" filter="url(#glow)">
+    <line x1="58" y1="196" x2="58" y2="172"/>
+    <line x1="42" y1="208" x2="42" y2="184"/>
+    <line x1="74" y1="208" x2="74" y2="184"/>
+    <line x1="336" y1="122" x2="336" y2="98"/>
+    <line x1="352" y1="134" x2="352" y2="110"/>
+    <line x1="320" y1="134" x2="320" y2="110"/>
+  </g>
+
+  <text x="200" y="252" font-family="Georgia, serif" font-weight="bold" font-size="26" fill="url(#title)" text-anchor="middle" filter="url(#glow)" letter-spacing="3">LUCKY SEVENS</text>
+  <text x="200" y="273" font-family="Arial, sans-serif" font-size="11" fill="#e8b0c8" text-anchor="middle" letter-spacing="5">TRIPLE 7 · JACKPOT MODE</text>
+</svg>
