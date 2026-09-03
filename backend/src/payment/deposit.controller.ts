@@ -48,6 +48,7 @@ export class DepositController {
       pspProvider: dto.pspProvider,
       metadata: dto.metadata,
       mobileGateway: dto.mobileGateway,
+      bdProvider: dto.bdProvider,
       customer: dto.customer,
     });
   }

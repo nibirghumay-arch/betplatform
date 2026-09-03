@@ -26,6 +26,11 @@ const MOBILE_GATEWAY_CHOICES: MobileGatewayChoice[] = [
   'TAP',
 ];
 
+// Providers the self-hosted BD gateway can take a Send Money on. Narrower than
+// the SSLCommerz list: it only supports wallets the owner holds a SIM for.
+export type BdGatewayChoice = 'BKASH' | 'NAGAD' | 'ROCKET' | 'UPAY';
+const BD_GATEWAY_CHOICES: BdGatewayChoice[] = ['BKASH', 'NAGAD', 'ROCKET', 'UPAY'];
+
 export class DepositCustomerDto {
   @IsString()
   @IsNotEmpty()
@@ -66,6 +71,12 @@ export class InitiateDepositDto {
   @IsOptional()
   @IsEnum(MOBILE_GATEWAY_CHOICES)
   mobileGateway?: MobileGatewayChoice;
+
+  /** Only meaningful when pspProvider === 'bdgateway'. Which of the owner's
+   * own mobile-money numbers the customer will Send Money to. */
+  @IsOptional()
+  @IsEnum(BD_GATEWAY_CHOICES)
+  bdProvider?: BdGatewayChoice;
 
   @IsOptional()
   @ValidateNested()

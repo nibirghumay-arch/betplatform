@@ -21,6 +21,8 @@ import { ReportingModule } from './reporting/reporting.module';
 import { NotificationModule } from './notification/notification.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { UsersModule } from './users/users.module';
+import { CronModule } from './cron/cron.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -44,6 +46,9 @@ import { UsersModule } from './users/users.module';
     AnalyticsModule,
     UsersModule,
     AuthModule,
+    // Serverless replacement for the in-process @Cron jobs.
+    CronModule,
+    HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

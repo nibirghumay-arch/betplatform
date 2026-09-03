@@ -21,11 +21,15 @@ import { PaymentMethodManager } from '@/components/payment/PaymentMethodManager'
 
 const MOBILE_WALLETS: PaymentMethodType[] = ['BKASH', 'NAGAD', 'ROCKET', 'UPAY', 'MCASH', 'TAP'];
 
+// The self-hosted gateway only covers wallets the operator holds a SIM for.
+const BD_GATEWAY_WALLETS: PaymentMethodType[] = ['BKASH', 'NAGAD', 'ROCKET', 'UPAY'];
+
 const depositSchema = z
   .object({
     amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount').refine((v) => parseFloat(v) >= 10, 'Minimum ৳10'),
     pspProvider: z.string().min(1, 'Select a provider'),
     mobileGateway: z.string().optional(),
+    bdProvider: z.string().optional(),
     phone: z.string().optional(),
   })
   .refine(
@@ -42,7 +46,7 @@ function DepositCard() {
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<DepositForm>({
     resolver: zodResolver(depositSchema),
-    defaultValues: { pspProvider: 'sslcommerz', mobileGateway: 'BKASH' },
+    defaultValues: { pspProvider: 'bdgateway', bdProvider: 'BKASH', mobileGateway: 'BKASH' },
   });
   const pspProvider = watch('pspProvider');
 
@@ -54,6 +58,7 @@ function DepositCard() {
         amount: parseFloat(data.amount),
         currency: 'BDT',
         pspProvider: data.pspProvider,
+        ...(data.pspProvider === 'bdgateway' && { bdProvider: data.bdProvider }),
         ...(data.pspProvider === 'sslcommerz' && {
           mobileGateway: data.mobileGateway,
           customer: {
@@ -95,11 +100,31 @@ function DepositCard() {
               {...register('pspProvider')}
               className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
             >
+              <option value="bdgateway">bKash / Nagad / Rocket / Upay — Send Money</option>
               <option value="sslcommerz">Mobile Banking / Card (SSLCommerz)</option>
               <option value="stripe">Stripe</option>
               <option value="paypal">PayPal</option>
             </select>
           </div>
+
+          {pspProvider === 'bdgateway' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-300">Send Money From</label>
+              <select
+                {...register('bdProvider')}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+              >
+                {BD_GATEWAY_WALLETS.map((w) => (
+                  <option key={w} value={w}>{PAYMENT_METHOD_LABELS[w]}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">
+                You&apos;ll see our receiving number on the next page. Send the exact amount, then
+                paste the TrxID from your confirmation SMS — the balance lands automatically once
+                it&apos;s verified.
+              </p>
+            </div>
+          )}
 
           {pspProvider === 'sslcommerz' && (
             <>

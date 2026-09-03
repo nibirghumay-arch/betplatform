@@ -14,8 +14,24 @@ import { WalletService } from '../wallet/wallet.service';
 import { PspSignatureService } from './psp-signature.service';
 import { SslcommerzService, SupportedMobileGateway } from './sslcommerz/sslcommerz.service';
 import { SslCallbackBody } from './sslcommerz/sslcommerz.types';
+import { BdGatewayService } from './bdgateway/bdgateway.service';
+import {
+  BdGatewayOrderDetail,
+  BdGatewayProvider,
+  BdGatewayWebhookPayload,
+} from './bdgateway/bdgateway.types';
 
 export const SSLCOMMERZ_PROVIDER = 'sslcommerz';
+/** Self-hosted bKash/Nagad/Rocket/Upay gateway (SMS-verified Send Money). */
+export const BDGATEWAY_PROVIDER = 'bdgateway';
+
+/** Human labels stored on Deposit.paymentChannel for transaction history. */
+const BD_PROVIDER_LABELS: Record<BdGatewayProvider, string> = {
+  BKASH: 'bKash',
+  NAGAD: 'Nagad',
+  ROCKET: 'Rocket',
+  UPAY: 'Upay',
+};
 
 export interface InitiateDepositParams {
   userId: string;
@@ -27,6 +43,9 @@ export interface InitiateDepositParams {
    * checkout page to a single mobile wallet (bKash/Nagad/Rocket/Upay/mCash/
    * Tap) instead of showing every method SSLCommerz supports. */
   mobileGateway?: SupportedMobileGateway;
+  /** Only used when pspProvider === 'bdgateway'. Which of the owner's mobile
+   * money accounts the customer will Send Money to. */
+  bdProvider?: BdGatewayProvider;
   customer?: {
     name: string;
     email: string;
@@ -50,6 +69,7 @@ export class DepositService {
     private readonly walletService: WalletService,
     private readonly pspSignature: PspSignatureService,
     private readonly sslcommerz: SslcommerzService,
+    private readonly bdGateway: BdGatewayService,
     private readonly config: ConfigService,
   ) {}
 
@@ -75,6 +95,10 @@ export class DepositService {
 
     if (params.pspProvider === SSLCOMMERZ_PROVIDER) {
       return this.initiateSslcommerz(deposit.id, amount, currency, params);
+    }
+
+    if (params.pspProvider === BDGATEWAY_PROVIDER) {
+      return this.initiateBdGateway(deposit.id, amount, currency, params);
     }
 
     // Stub: in production this calls the PSP SDK (e.g. Stripe.checkout.sessions.create).
@@ -185,6 +209,157 @@ export class DepositService {
     if (depositId) {
       await this.markFailed(depositId, reason);
     }
+  }
+
+  // ─── BD Payment Gateway (bKash / Nagad / Rocket / Upay) ─────────────────────
+
+  private async initiateBdGateway(
+    depositId: string,
+    amount: Decimal,
+    currency: string,
+    params: InitiateDepositParams,
+  ): Promise<InitiateDepositResult> {
+    if (currency !== 'BDT') {
+      await this.markFailed(depositId, `Gateway settles BDT only, got ${currency}`);
+      throw new BadRequestException('The bKash/Nagad gateway only accepts BDT deposits');
+    }
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    const provider = params.bdProvider ?? 'BKASH';
+
+    try {
+      const order = await this.bdGateway.createOrder({
+        amountBdt: amount.toDecimalPlaces(2).toNumber(),
+        provider,
+        returnUrl: `${frontendUrl}/wallet/deposit/result?status=pending&depositId=${depositId}`,
+        // Echoed back on the webhook — this is how we find the Deposit again.
+        metadata: { depositId, userId: params.userId },
+        expiresInMinutes: 30,
+      });
+
+      await this.prisma.deposit.update({
+        where: { id: depositId },
+        data: {
+          // The gateway's order reference is our handle on the session.
+          pspSessionId: order.reference,
+          paymentChannel: BD_PROVIDER_LABELS[provider],
+        },
+      });
+
+      this.logger.log(
+        `BD gateway deposit initiated: id=${depositId} userId=${params.userId} amount=${amount.toFixed(2)} provider=${provider} ref=${order.reference}`,
+      );
+
+      return { depositId, checkoutUrl: order.checkoutUrl, expiresAt: new Date(order.expiresAt) };
+    } catch (err) {
+      await this.markFailed(depositId, (err as Error).message);
+      throw err;
+    }
+  }
+
+  /**
+   * Entry point for a signature-verified gateway webhook. The body is only a
+   * hint: we re-read the order from the gateway API and act on that, so a
+   * forged-but-correctly-signed payload still cannot invent a payment.
+   */
+  async handleBdGatewayWebhook(payload: BdGatewayWebhookPayload): Promise<void> {
+    if (!payload?.reference) {
+      this.logger.error('BD gateway webhook carried no reference — ignoring');
+      return;
+    }
+
+    const order = await this.bdGateway.getOrder(payload.reference);
+    if (!order) {
+      this.logger.warn(`BD gateway webhook for unknown order ${payload.reference}`);
+      return;
+    }
+
+    await this.applyBdGatewayOrder(order, payload.metadata ?? null);
+  }
+
+  /** Re-check one deposit against the gateway — for late or lost webhooks. */
+  async reconcileBdGatewayDeposit(
+    depositId: string,
+  ): Promise<{ depositId: string; status: string; gatewayStatus: string }> {
+    const deposit = await this.findById(depositId);
+
+    if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
+      throw new BadRequestException(
+        `Deposit ${depositId} was not created through the bKash/Nagad gateway`,
+      );
+    }
+    if (!deposit.pspSessionId) {
+      throw new BadRequestException(`Deposit ${depositId} has no gateway order attached`);
+    }
+
+    const order = await this.bdGateway.getOrder(deposit.pspSessionId);
+    if (!order) {
+      throw new NotFoundException(`Gateway order ${deposit.pspSessionId} no longer exists`);
+    }
+
+    await this.applyBdGatewayOrder(order, { depositId });
+
+    const fresh = await this.prisma.deposit.findUnique({ where: { id: depositId } });
+    return {
+      depositId,
+      status: fresh?.status ?? deposit.status,
+      gatewayStatus: order.status,
+    };
+  }
+
+  /** Applies whatever the gateway says the order's state is, exactly once. */
+  private async applyBdGatewayOrder(
+    order: BdGatewayOrderDetail,
+    metadataHint: Record<string, unknown> | null,
+  ): Promise<void> {
+    const deposit = await this.findBdGatewayDeposit(order.reference, order.metadata ?? metadataHint);
+    if (!deposit) {
+      this.logger.warn(`No deposit matches gateway order ${order.reference}`);
+      return;
+    }
+
+    if (order.status === 'APPROVED') {
+      // The gateway only approves when a forwarded SMS matches BOTH the TrxID
+      // and the exact amount, so order.amountBdt is what actually arrived.
+      await this.settle(
+        order.submittedTrxId || order.reference,
+        new Decimal(order.amountBdt),
+        (order.currency ?? 'BDT').toUpperCase(),
+        deposit.id,
+        {
+          gatewayReference: order.reference,
+          gatewayProvider: order.provider,
+          trxId: order.submittedTrxId ?? null,
+          customerMsisdn: order.customerMsisdn ?? null,
+          receivingNumber: order.receivingNumber,
+        },
+      );
+      return;
+    }
+
+    if (order.status === 'REJECTED' || order.status === 'EXPIRED') {
+      await this.markFailed(
+        deposit.id,
+        order.status === 'EXPIRED'
+          ? 'Gateway order expired before the payment could be verified'
+          : 'Payment rejected by the gateway operator',
+      );
+      return;
+    }
+
+    this.logger.debug(`Gateway order ${order.reference} is still ${order.status} — nothing to do`);
+  }
+
+  private async findBdGatewayDeposit(reference: string, metadata?: Record<string, unknown> | null) {
+    const hinted = typeof metadata?.depositId === 'string' ? metadata.depositId : undefined;
+    if (hinted) {
+      const byId = await this.prisma.deposit.findUnique({ where: { id: hinted } });
+      if (byId) return byId;
+    }
+    return this.prisma.deposit.findFirst({
+      where: { pspSessionId: reference, pspProvider: BDGATEWAY_PROVIDER },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // ─── Webhook ────────────────────────────────────────────────────────────────

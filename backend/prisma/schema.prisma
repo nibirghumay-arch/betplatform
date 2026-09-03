@@ -1,6 +1,9 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl"]
+  provider = "prisma-client-js"
+  // rhel-openssl-3.0.x is what Netlify Functions (Amazon Linux 2023 Lambda)
+  // need — without it the query engine is missing at runtime. The musl targets
+  // stay for Alpine-based Docker images.
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x", "linux-musl"]
 }
 
 datasource db {

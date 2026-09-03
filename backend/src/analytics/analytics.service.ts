@@ -34,6 +34,14 @@ export class AnalyticsService {
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async scheduledSnapshot(): Promise<void> {
+    // On Netlify the container is frozen between requests, so this timer is
+    // unreliable — netlify/functions/daily-snapshot.mts drives the snapshot
+    // through POST /api/v1/internal/cron/analytics-snapshot instead. Running
+    // both would double-write the same row.
+    if (process.env.NETLIFY === 'true' || process.env.DISABLE_IN_PROCESS_CRON === 'true') {
+      return;
+    }
+
     try {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);

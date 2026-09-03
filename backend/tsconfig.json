@@ -11,7 +11,10 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": "./",
-    "incremental": true,
+    // Deliberately NOT incremental: nest-cli deletes dist/ before every build
+    // (deleteOutDir), while tsc would trust tsconfig.tsbuildinfo and skip
+    // emitting — leaving dist/ empty and the Netlify function unable to
+    // require ../../dist/app.factory.
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,

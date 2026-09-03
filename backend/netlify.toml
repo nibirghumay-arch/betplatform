@@ -1,0 +1,100 @@
+# ============================================================
+# Betting platform — NestJS backend on Netlify Functions
+#
+# In Netlify, set "Base directory" to:  backend
+# (this file's paths are all relative to that directory)
+#
+# The whole API is served by ONE function: netlify/functions/api.js.
+# Every /api/v1/* request is rewritten to it, and NestJS routes
+# internally exactly as it does locally.
+#
+# Required environment variables (Site configuration → Environment):
+#   DATABASE_URL      pooled Postgres URL (Neon/Supabase pooler, port 6543)
+#   JWT_SECRET        openssl rand -hex 32
+#   CRON_SECRET       openssl rand -hex 32  (guards the internal cron route)
+#   API_PUBLIC_URL    https://<this-site>.netlify.app/api/v1
+#   FRONTEND_URL      https://<frontend-site>.netlify.app
+#   ALLOWED_ORIGIN    https://<frontend-site>.netlify.app
+#   NODE_ENV          production
+#   BD_GATEWAY_URL / BD_GATEWAY_API_KEY / BD_GATEWAY_API_SECRET /
+#   BD_GATEWAY_WEBHOOK_SECRET   from the gateway's admin → Merchants screen
+#   SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD / SSLCOMMERZ_LIVE (optional)
+#
+# Database migrations are NOT run by the build. Apply them once per schema
+# change from your machine, against the DIRECT (non-pooled) URL:
+#   DATABASE_URL="postgresql://...direct..." npx prisma migrate deploy
+# ============================================================
+
+[build]
+  command = "npm run build:netlify"
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Prisma downloads the engine matching this target at generate time.
+  PRISMA_CLI_BINARY_TARGETS = "rhel-openssl-3.0.x"
+
+[functions]
+  node_bundler = "esbuild"
+
+  # NestJS resolves providers through decorator metadata and loads several
+  # packages with dynamic require()s. Bundling those breaks DI, so they are
+  # copied into the zip untouched instead. bcrypt is a native addon and
+  # @prisma/client needs its generated .prisma sibling — same reason.
+  external_node_modules = [
+    "@nestjs/common",
+    "@nestjs/config",
+    "@nestjs/core",
+    "@nestjs/event-emitter",
+    "@nestjs/jwt",
+    "@nestjs/mapped-types",
+    "@nestjs/microservices",
+    "@nestjs/passport",
+    "@nestjs/platform-express",
+    "@nestjs/platform-socket.io",
+    "@nestjs/schedule",
+    "@nestjs/swagger",
+    "@nestjs/throttler",
+    "@nestjs/websockets",
+    "@prisma/client",
+    "bcrypt",
+    "@mapbox/node-pre-gyp",
+    "cache-manager",
+    "class-transformer",
+    "class-validator",
+    "decimal.js",
+    "express",
+    "nodemailer",
+    "passport",
+    "passport-jwt",
+    "reflect-metadata",
+    "rxjs",
+    "swagger-ui-express",
+    "swagger-ui-dist",
+    "uuid"
+  ]
+
+  # The generated Prisma client + its query engine binary live outside the
+  # dependency graph esbuild can see, so ship them explicitly.
+  included_files = [
+    "node_modules/.prisma/client/**",
+    "prisma/schema.prisma"
+  ]
+
+# ─── Routing ────────────────────────────────────────────────
+# The doubled "api" is intentional: the function strips the
+# /.netlify/functions/api prefix, leaving the /api/v1/... path
+# Nest's global prefix expects.
+
+[[redirects]]
+  from = "/api/v1/*"
+  to = "/.netlify/functions/api/api/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1"
+  to = "/.netlify/functions/api/api/v1"
+  status = 200
+  force = true
