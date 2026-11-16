@@ -28,11 +28,6 @@ type DepositRecord = {
   createdAt: string;
 };
 
-function maskNumber(value: string) {
-  if (value.length < 7) return value;
-  return `${value.slice(0, 3)}••••${value.slice(-3)}`;
-}
-
 export default function BetPlatformGatewayCheckoutPage() {
   const params = useParams<{ depositId: string }>();
   const router = useRouter();
@@ -68,15 +63,17 @@ export default function BetPlatformGatewayCheckoutPage() {
 
   const status = deposit?.status;
   const terminal = status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED';
+  const activeDepositId = deposit?.id;
+  const activeProvider = deposit?.pspProvider;
 
   useEffect(() => {
-    if (!deposit || terminal || deposit.pspProvider !== 'bdgateway') return;
+    if (!activeDepositId || terminal || activeProvider !== 'bdgateway') return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
     const poll = async () => {
       try {
-        await api.post(`/payment/deposit/bdgateway/${encodeURIComponent(deposit.id)}/reconcile`);
+        await api.post(`/payment/deposit/bdgateway/${encodeURIComponent(activeDepositId)}/reconcile`);
         const updated = await loadDeposit();
         if (!cancelled && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(updated.status)) {
           setNotice(updated.status === 'COMPLETED'
@@ -98,7 +95,7 @@ export default function BetPlatformGatewayCheckoutPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [deposit, terminal, loadDeposit, router]);
+  }, [activeDepositId, activeProvider, terminal, loadDeposit, router]);
 
   const gatewayInfo = deposit?.metadata?.bdGateway;
   const submit = async (event: FormEvent) => {
