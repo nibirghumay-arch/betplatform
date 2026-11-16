@@ -57,6 +57,11 @@ export class WithdrawalService {
     // Validate wallet state — hard checks.
     const wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== currency) {
+      throw new BadRequestException(
+        `Your wallet is denominated in ${wallet.currency}; this withdrawal is denominated in ${currency}.`,
+      );
+    }
 
     // Advisory balance check — the hard locked check happens in transactionService.withdraw()
     // at settlement time. This is an early-fail for UX.
