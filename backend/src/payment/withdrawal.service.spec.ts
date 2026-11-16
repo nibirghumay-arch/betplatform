@@ -19,6 +19,9 @@ function makePrisma(overrides: Record<string, any> = {}) {
       findFirst: jest.fn(),
       findMany: jest.fn(),
     },
+    transaction: {
+      findUnique: jest.fn(),
+    },
     user: {
       findUnique: jest.fn().mockResolvedValue({ kycVerified: false }),
     },
@@ -289,6 +292,80 @@ describe('WithdrawalService', () => {
   });
 
   // ─── reject ───────────────────────────────────────────────────────────
+
+  describe('markManuallyPaid', () => {
+    it('debits the wallet once and records the actual payout reference', async () => {
+      const processing = makeWithdrawal('w-manual-1', WithdrawalStatus.PROCESSING);
+      const completed = {
+        ...processing,
+        status: WithdrawalStatus.COMPLETED,
+        transactionId: 'tx-w-1',
+        pspReference: 'BK123456789',
+      };
+      const prisma = makePrisma();
+      prisma.withdrawal.findUnique
+        .mockResolvedValueOnce(processing)
+        .mockResolvedValueOnce(completed);
+      prisma.transaction.findUnique.mockResolvedValue(null);
+      prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 });
+      const transactionService = makeTransactionService();
+
+      const svc = makeService({ prisma, transactionService });
+      const result = await svc.markManuallyPaid('w-manual-1', 'admin-1', ' BK123456789 ');
+
+      expect(transactionService.withdraw).toHaveBeenCalledWith(expect.objectContaining({
+        userId: 'u1',
+        amount: expect.any(Decimal),
+        reference: 'withdrawal:w-manual-1',
+        initiatedBy: 'admin-1',
+        metadata: expect.objectContaining({ manualPayoutReference: 'BK123456789' }),
+      }));
+      expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: {
+          id: 'w-manual-1',
+          status: WithdrawalStatus.PROCESSING,
+          transactionId: null,
+        },
+        data: expect.objectContaining({
+          status: WithdrawalStatus.COMPLETED,
+          transactionId: 'tx-w-1',
+          pspReference: 'BK123456789',
+        }),
+      }));
+      expect(result).toEqual({
+        withdrawalId: 'w-manual-1',
+        status: WithdrawalStatus.COMPLETED,
+        transactionId: 'tx-w-1',
+      });
+    });
+
+    it('does not debit a withdrawal already completed', async () => {
+      const completed = {
+        ...makeWithdrawal('w-manual-2', WithdrawalStatus.COMPLETED),
+        transactionId: 'existing-tx',
+      };
+      const prisma = makePrisma();
+      prisma.withdrawal.findUnique.mockResolvedValue(completed);
+      const transactionService = makeTransactionService();
+
+      const svc = makeService({ prisma, transactionService });
+      const result = await svc.markManuallyPaid('w-manual-2', 'admin-1', 'BK123456789');
+
+      expect(transactionService.withdraw).not.toHaveBeenCalled();
+      expect(result.transactionId).toBe('existing-tx');
+    });
+
+    it('rejects attempts to mark an unapproved withdrawal as paid', async () => {
+      const pending = makeWithdrawal('w-manual-3', WithdrawalStatus.PENDING_REVIEW);
+      const prisma = makePrisma();
+      prisma.withdrawal.findUnique.mockResolvedValue(pending);
+      const svc = makeService({ prisma });
+
+      await expect(
+        svc.markManuallyPaid('w-manual-3', 'admin-1', 'BK123456789'),
+      ).rejects.toThrow('must be approved and in PROCESSING');
+    });
+  });
 
   describe('reject', () => {
     it.each([WithdrawalStatus.PENDING_KYC, WithdrawalStatus.PENDING_REVIEW])(
