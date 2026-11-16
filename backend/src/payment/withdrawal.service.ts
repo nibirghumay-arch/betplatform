@@ -52,16 +52,14 @@ export class WithdrawalService {
 
   async request(params: RequestWithdrawalParams): Promise<RequestWithdrawalResult> {
     const amount = this.parseAmount(params.amount);
-    const currency = params.currency ?? 'USD';
+    if (params.currency && params.currency.toUpperCase() !== 'BDT') {
+      throw new BadRequestException('BetPlatform only supports BDT withdrawals.');
+    }
+    const currency = 'BDT';
 
-    // Validate wallet state — hard checks.
+    // Validate wallet state — all user wallets are normalized to BDT by WalletService.
     const wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
-    if (wallet.currency !== currency) {
-      throw new BadRequestException(
-        `Your wallet is denominated in ${wallet.currency}; this withdrawal is denominated in ${currency}.`,
-      );
-    }
 
     // Advisory balance check — the hard locked check happens in transactionService.withdraw()
     // at settlement time. This is an early-fail for UX.
@@ -137,10 +135,11 @@ export class WithdrawalService {
     // operator is sending it manually or waiting for an external PSP.
     const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
     await this.walletService.assertWalletActive(wallet.id);
-    if (wallet.currency !== withdrawal.currency) {
-      throw new BadRequestException(
-        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
-      );
+    if (withdrawal.currency !== 'BDT') {
+      await this.prisma.withdrawal.update({
+        where: { id: withdrawalId },
+        data: { currency: 'BDT' },
+      });
     }
 
     const ledgerReference = `withdrawal:${withdrawal.id}`;
@@ -216,10 +215,11 @@ export class WithdrawalService {
 
     const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
     await this.walletService.assertWalletActive(wallet.id);
-    if (wallet.currency !== withdrawal.currency) {
-      throw new BadRequestException(
-        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
-      );
+    if (withdrawal.currency !== 'BDT') {
+      await this.prisma.withdrawal.update({
+        where: { id: withdrawalId },
+        data: { currency: 'BDT' },
+      });
     }
 
     const ledgerReference = `withdrawal:${withdrawal.id}`;
