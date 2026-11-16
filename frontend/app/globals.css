@@ -181,3 +181,49 @@ tbody tr:hover { background-color: rgba(126, 110, 255, 0.055); }
 @layer utilities {
   .text-balance { text-wrap: balance; }
 }
+
+
+/* Shared surfaces used by the existing dashboards and forms */
+main [class~="bg-white/5"],
+main [class~="bg-white/[0.03]"],
+main [class~="bg-white/[0.04]"] {
+  background-color: rgba(25, 34, 60, 0.72) !important;
+  border-color: rgba(166, 181, 235, 0.13) !important;
+}
+main [class~="bg-white/10"] {
+  background-color: rgba(126, 141, 191, 0.12) !important;
+}
+main [class~="border-white/10"] { border-color: rgba(166, 181, 235, 0.15) !important; }
+
+.gateway-select option[value="BKASH"],
+.gateway-select option[value="bdgateway"] { color: #ff83b5; background: #24152d; }
+.gateway-select option[value="NAGAD"] { color: #ffb36e; background: #2b1c23; }
+.gateway-select option[value="ROCKET"] { color: #c7a4ff; background: #211934; }
+.gateway-select option[value="UPAY"] { color: #83caff; background: #14253a; }
+.gateway-select option[value="MCASH"] { color: #81e4d1; background: #12302f; }
+.gateway-select option[value="TAP"] { color: #8fd0ff; background: #14253a; }
+.gateway-select option[value="sslcommerz"] { color: #67e2d7; background: #12302f; }
+.gateway-select option[value="stripe"] { color: #b7a5ff; background: #211934; }
+.gateway-select option[value="paypal"] { color: #87caff; background: #14253a; }
+
+main h1 {
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+main h2 { letter-spacing: -0.025em; }
+
+@media (max-width: 767px) {
+  main > div[class*="px-"] {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  main {
+    overscroll-behavior-y: contain;
+  }
+  table { white-space: nowrap; }
+}
+
+@media (max-width: 420px) {
+  .bp-card { padding: 1rem; }
+  main h1 { font-size: 1.5rem; }
+}
