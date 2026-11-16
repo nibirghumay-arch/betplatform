@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 
 const WITHDRAWAL_STATUSES = ['PENDING_REVIEW', 'PROCESSING', 'COMPLETED', 'REJECTED', 'FAILED'];
-const DEPOSIT_STATUSES = ['PENDING_PAYMENT', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'];
 const PROVIDERS = [
   { value: 'BKASH', label: 'bKash' },
   { value: 'NAGAD', label: 'Nagad' },
