@@ -171,7 +171,7 @@ export default function BetPlatformGatewayCheckoutPage() {
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Deposit summary</CardTitle>
           <span className={`rounded-full px-3 py-1 text-xs font-medium ${complete ? 'bg-green-500/15 text-green-400' : expired ? 'bg-red-500/15 text-red-400' : 'bg-amber-500/15 text-amber-300'}`}>
-            {deposit.status.replaceAll('_', ' ')}
+            {deposit.status.replace(/_/g, ' ')}
           </span>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -214,7 +214,7 @@ export default function BetPlatformGatewayCheckoutPage() {
               placeholder="01XXXXXXXXX"
               value={customerMsisdn}
               onChange={(event) => setCustomerMsisdn(event.target.value)}
-              inputType="tel"
+              type="tel"
             />
             {error && <p className="rounded-lg bg-red-900/30 px-3 py-2 text-sm text-red-400">{error}</p>}
             {notice && <p className="rounded-lg bg-green-900/20 px-3 py-2 text-sm text-green-300">{notice}</p>}
