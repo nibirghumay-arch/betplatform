@@ -132,9 +132,43 @@ export class WithdrawalService {
       );
     }
 
-    // Stub: in production this calls the PSP SDK to initiate a payout.
-    const pspPayoutId = `payout_${uuidv4()}`;
+    // Reserve the requested funds when the administrator approves the
+    // payout. This prevents the player from wagering the amount while the
+    // operator is sending it manually or waiting for an external PSP.
+    const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
+    await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== withdrawal.currency) {
+      throw new BadRequestException(
+        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
+      );
+    }
 
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    let transaction = await this.prisma.transaction.findUnique({
+      where: { reference: ledgerReference },
+      select: { id: true },
+    });
+    if (!transaction) {
+      try {
+        const result = await this.transactionService.withdraw({
+          userId: withdrawal.userId,
+          amount: new Decimal(withdrawal.amount.toString()),
+          reference: ledgerReference,
+          description: `Withdrawal reserve via ${withdrawal.pspProvider}`,
+          metadata: { withdrawalId: withdrawal.id, reservedBy: adminId },
+          initiatedBy: adminId,
+        });
+        transaction = { id: result.transactionId };
+      } catch (error) {
+        transaction = await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+        if (!transaction) throw error;
+      }
+    }
+
+    const pspPayoutId = `payout_${uuidv4()}`;
     await this.prisma.withdrawal.update({
       where: { id: withdrawalId },
       data: {
@@ -142,6 +176,7 @@ export class WithdrawalService {
         reviewedBy: adminId,
         reviewedAt: new Date(),
         pspPayoutId,
+        transactionId: transaction.id,
       },
     });
 
@@ -188,10 +223,12 @@ export class WithdrawalService {
     }
 
     const ledgerReference = `withdrawal:${withdrawal.id}`;
-    let transaction = await this.prisma.transaction.findUnique({
-      where: { reference: ledgerReference },
-      select: { id: true },
-    });
+    let transaction = withdrawal.transactionId
+      ? { id: withdrawal.transactionId }
+      : await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
 
     // A retry after an interrupted admin action reuses the already-created
     // ledger transaction rather than debiting the wallet twice.
@@ -433,18 +470,26 @@ export class WithdrawalService {
     const amount = new Decimal(withdrawal.amount.toString());
 
     try {
-      const txResult = await this.transactionService.withdraw({
-        userId: withdrawal.userId,
-        amount,
-        reference: `withdrawal:${withdrawal.id}`,
-        description: `Withdrawal via ${withdrawal.pspProvider}`,
-        metadata: {
-          withdrawalId: withdrawal.id,
-          pspPayoutId,
-          pspReference,
-          ...webhookData,
-        },
-      });
+      const existingTransaction = withdrawal.transactionId
+        ? { id: withdrawal.transactionId }
+        : await this.prisma.transaction.findUnique({
+            where: { reference: `withdrawal:${withdrawal.id}` },
+            select: { id: true },
+          });
+      const txResult = existingTransaction
+        ? { transactionId: existingTransaction.id }
+        : await this.transactionService.withdraw({
+            userId: withdrawal.userId,
+            amount,
+            reference: `withdrawal:${withdrawal.id}`,
+            description: `Withdrawal via ${withdrawal.pspProvider}`,
+            metadata: {
+              withdrawalId: withdrawal.id,
+              pspPayoutId,
+              pspReference,
+              ...webhookData,
+            },
+          });
 
       await this.prisma.withdrawal.update({
         where: { id: withdrawal.id },
