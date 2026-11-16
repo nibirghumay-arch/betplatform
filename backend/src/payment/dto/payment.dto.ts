@@ -124,6 +124,13 @@ export class RejectWithdrawalDto {
   reason: string;
 }
 
+
+export class MarkWithdrawalPaidDto {
+  @IsString()
+  @IsNotEmpty()
+  payoutReference: string;
+}
+
 export class CancelWithdrawalDto {}
 
 export class PaginationQueryDto {
