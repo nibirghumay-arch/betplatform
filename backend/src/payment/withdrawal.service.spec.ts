@@ -345,6 +345,38 @@ describe('WithdrawalService', () => {
       });
     });
 
+    it('reuses the already-reserved ledger transaction when marking a withdrawal paid', async () => {
+      const processing = {
+        ...makeWithdrawal('w-manual-reserved', WithdrawalStatus.PROCESSING),
+        transactionId: 'reserved-tx',
+      };
+      const completed = {
+        ...processing,
+        status: WithdrawalStatus.COMPLETED,
+        pspReference: 'NAGAD123456',
+      };
+      const prisma = makePrisma();
+      prisma.withdrawal.findUnique
+        .mockResolvedValueOnce(processing)
+        .mockResolvedValueOnce(completed);
+      prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 });
+      const transactionService = makeTransactionService();
+
+      const svc = makeService({ prisma, transactionService });
+      const result = await svc.markManuallyPaid('w-manual-reserved', 'admin-1', 'NAGAD123456');
+
+      expect(transactionService.withdraw).not.toHaveBeenCalled();
+      expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ transactionId: 'reserved-tx' }),
+        data: expect.objectContaining({
+          status: WithdrawalStatus.COMPLETED,
+          transactionId: 'reserved-tx',
+          pspReference: 'NAGAD123456',
+        }),
+      }));
+      expect(result.transactionId).toBe('reserved-tx');
+    });
+
     it('does not debit a withdrawal already completed', async () => {
       const completed = {
         ...makeWithdrawal('w-manual-2', WithdrawalStatus.COMPLETED),
@@ -504,9 +536,9 @@ describe('WithdrawalService', () => {
 
     it('routes payout.failed to markFailed', async () => {
       const prisma = makePrisma();
-      prisma.withdrawal.findFirst.mockResolvedValue(
-        makeWithdrawal('w-1', WithdrawalStatus.PROCESSING),
-      );
+      const withdrawal = makeWithdrawal('w-1', WithdrawalStatus.PROCESSING);
+      prisma.withdrawal.findFirst.mockResolvedValue(withdrawal);
+      prisma.withdrawal.findUnique.mockResolvedValue(withdrawal);
       prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 });
 
       const svc = makeService({ prisma });
