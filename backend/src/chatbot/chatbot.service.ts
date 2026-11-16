@@ -1,4 +1,4 @@
-import { Injectable, Logger, TooManyRequestsException } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatbotHistoryMessageDto } from './dto/chatbot-message.dto';
 
@@ -105,7 +105,7 @@ export class ChatbotService {
       this.rateLimits.set(clientKey, { count: 1, resetAt: now + 60_000 });
     } else {
       if (current.count >= 15) {
-        throw new TooManyRequestsException('Too many chat messages. Please wait a minute and try again.');
+        throw new HttpException('Too many chat messages. Please wait a minute and try again.', HttpStatus.TOO_MANY_REQUESTS);
       }
       current.count += 1;
     }
