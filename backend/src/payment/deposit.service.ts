@@ -81,6 +81,11 @@ export class DepositService {
 
     const wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== currency) {
+      throw new BadRequestException(
+        `Your wallet is denominated in ${wallet.currency}; this deposit is denominated in ${currency}. Contact support before attempting a currency change.`,
+      );
+    }
 
     const deposit = await this.prisma.deposit.create({
       data: {
@@ -280,8 +285,12 @@ export class DepositService {
   /** Re-check one deposit against the gateway — for late or lost webhooks. */
   async reconcileBdGatewayDeposit(
     depositId: string,
+    userId: string,
   ): Promise<{ depositId: string; status: string; gatewayStatus: string }> {
     const deposit = await this.findById(depositId);
+    if (deposit.userId !== userId) {
+      throw new NotFoundException(`Deposit ${depositId} not found`);
+    }
 
     if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
       throw new BadRequestException(
@@ -317,14 +326,26 @@ export class DepositService {
       this.logger.warn(`No deposit matches gateway order ${order.reference}`);
       return;
     }
+    if (deposit.pspSessionId !== order.reference) {
+      this.logger.error(`BD gateway order reference mismatch for deposit ${deposit.id}`);
+      return;
+    }
+    if (
+      (order.currency ?? '').toUpperCase() !== 'BDT' ||
+      !new Decimal(order.amountBdt).equals(new Decimal(deposit.amount.toString()))
+    ) {
+      this.logger.error(`BD gateway amount/currency mismatch for deposit ${deposit.id}; refusing settlement`);
+      await this.markFailed(deposit.id, 'Gateway amount or currency did not match the original deposit request');
+      return;
+    }
 
     if (order.status === 'APPROVED') {
       // The gateway only approves when a forwarded SMS matches BOTH the TrxID
       // and the exact amount, so order.amountBdt is what actually arrived.
       await this.settle(
         order.submittedTrxId || order.reference,
-        new Decimal(order.amountBdt),
-        (order.currency ?? 'BDT').toUpperCase(),
+        new Decimal(deposit.amount.toString()),
+        'BDT',
         deposit.id,
         {
           gatewayReference: order.reference,
