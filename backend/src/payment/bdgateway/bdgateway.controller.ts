@@ -6,6 +6,7 @@ import {
   Logger,
   Param,
   Post,
+  Req,
   RawBodyRequest,
   Req,
   UnauthorizedException,
@@ -28,6 +29,8 @@ import { BdGatewayWebhookPayload } from './bdgateway.types';
  */
 @ApiTags('Payment – Deposits')
 @Controller('payment/deposit/bdgateway')
+interface RequestWithUser extends Request { user: { userId: string; role: string } };
+
 export class BdGatewayController {
   private readonly logger = new Logger(BdGatewayController.name);
 
@@ -51,7 +54,7 @@ export class BdGatewayController {
       throw new UnauthorizedException('Raw body unavailable — cannot verify signature');
     }
 
-    if (!this.bdGateway.verifyWebhookSignature(signature, rawBody)) {
+    if (!(await this.bdGateway.verifyWebhookSignature(signature, rawBody))) {
       this.logger.warn('Rejected BD gateway webhook: invalid or expired signature');
       // 401 (not 200) so the gateway keeps the delivery in its retry queue.
       throw new UnauthorizedException('Invalid webhook signature');
@@ -77,7 +80,7 @@ export class BdGatewayController {
    */
   @Post(':depositId/reconcile')
   @HttpCode(HttpStatus.OK)
-  reconcile(@Param('depositId') depositId: string) {
-    return this.depositService.reconcileBdGatewayDeposit(depositId);
+  reconcile(@Param('depositId') depositId: string, @Req() request: RequestWithUser) {
+    return this.depositService.reconcileBdGatewayDeposit(depositId, request.user.userId);
   }
 }
