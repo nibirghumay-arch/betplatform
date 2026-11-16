@@ -288,6 +288,29 @@ export class WithdrawalService {
     };
   }
 
+  /** Mark an unsent/failed manual payout as failed and release its reserve. */
+  async failManualPayout(
+    withdrawalId: string,
+    adminId: string,
+    reason: string,
+  ): Promise<{ withdrawalId: string; status: WithdrawalStatus }> {
+    const withdrawal = await this.findById(withdrawalId);
+    if (withdrawal.status !== WithdrawalStatus.PROCESSING) {
+      throw new BadRequestException('Only a PROCESSING withdrawal can be failed by an administrator');
+    }
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 4 || normalizedReason.length > 500) {
+      throw new BadRequestException('Enter a reason between 4 and 500 characters');
+    }
+
+    await this.markFailed(
+      withdrawalId,
+      `Manual payout marked failed by ${adminId}: ${normalizedReason}`,
+    );
+    const updated = await this.findById(withdrawalId);
+    return { withdrawalId, status: updated.status };
+  }
+
   // ─── Admin: reject ──────────────────────────────────────────────────────────
 
   async reject(withdrawalId: string, adminId: string, reason: string): Promise<void> {
