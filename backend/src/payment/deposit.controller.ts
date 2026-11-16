@@ -10,6 +10,7 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
@@ -25,6 +26,8 @@ import { InitiateDepositDto, DepositListQueryDto } from './dto/payment.dto';
 @ApiTags('Payment – Deposits')
 @ApiBearerAuth()
 @Controller('payment/deposit')
+interface RequestWithUser extends Request { user: { userId: string; role: string } };
+
 export class DepositController {
   constructor(
     private readonly depositService: DepositService,
@@ -40,9 +43,9 @@ export class DepositController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  initiate(@Body() dto: InitiateDepositDto) {
+  initiate(@Body() dto: InitiateDepositDto, @Req() request: RequestWithUser) {
     return this.depositService.initiate({
-      userId: dto.userId,
+      userId: request.user.userId,
       amount: dto.amount,
       currency: dto.currency,
       pspProvider: dto.pspProvider,
@@ -173,12 +176,16 @@ export class DepositController {
   }
 
   @Get()
-  list(@Query() query: DepositListQueryDto) {
-    return this.depositService.listByUser(query.userId ?? '', query.skip, query.take);
+  list(@Query() query: DepositListQueryDto, @Req() request: RequestWithUser) {
+    return this.depositService.listByUser(request.user.userId, query.skip, query.take);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.depositService.findById(id);
+  async findOne(@Param('id') id: string, @Req() request: RequestWithUser) {
+    const deposit = await this.depositService.findById(id);
+    if (deposit.userId !== request.user.userId) {
+      throw new NotFoundException(`Deposit ${id} not found`);
+    }
+    return deposit;
   }
 }
