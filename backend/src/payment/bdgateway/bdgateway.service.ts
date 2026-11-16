@@ -61,6 +61,14 @@ export class BdGatewayService {
     return order;
   }
 
+  async submitTrxId(reference: string, trxId: string, customerMsisdn?: string) {
+    return this.request<{ status: string; message: string }>(
+      'POST',
+      `/api/orders/${encodeURIComponent(reference)}/submit-trx`,
+      { trxId, ...(customerMsisdn ? { customerMsisdn } : {}) },
+    );
+  }
+
   async getOrder(reference: string): Promise<BdGatewayOrderDetail | null> {
     try {
       return await this.request<BdGatewayOrderDetail>(
@@ -75,7 +83,7 @@ export class BdGatewayService {
 
   async verifyWebhookSignature(header: string | undefined, rawBody: Buffer | string): Promise<boolean> {
     const runtime = await this.gatewayConfig.getRuntimeConfig();
-    if (!runtime.enabled || !runtime.webhookSecret || !header) return false;
+    if (!runtime.configured || !runtime.webhookSecret || !header) return false;
 
     const parts = new Map<string, string>();
     for (const kv of header.split(',')) {
@@ -101,8 +109,8 @@ export class BdGatewayService {
 
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
     const runtime = await this.gatewayConfig.getRuntimeConfig();
-    if (!runtime.enabled || !runtime.configured) {
-      throw new BadRequestException('The BD payment gateway is not enabled on this site');
+    if (!runtime.configured) {
+      throw new BadRequestException('The BD payment gateway is not configured on this site');
     }
 
     const timeoutMs = Number(this.config.get<string>('BD_GATEWAY_TIMEOUT_MS') ?? 10000);
