@@ -18,7 +18,9 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
+  // Keep the customer's original casing so legacy duplicate records can be
+  // disambiguated after the case-insensitive database lookup.
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsEmail()
   email!: string;
 
