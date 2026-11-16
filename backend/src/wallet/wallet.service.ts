@@ -57,6 +57,126 @@ export class WalletService {
     return wallet;
   }
 
+  /**
+   * Admin-approved legacy currency migration. Historical USD entries remain
+   * immutable and are offset to zero through a USD debit; a separate BDT
+   * opening-credit transaction establishes the converted BDT balance.
+   */
+  async migrateUserWalletToBdt(
+    userId: string,
+    adminId: string,
+    bdtPerUsd: string,
+    reason: string,
+  ): Promise<{ walletId: string; previousCurrency: string; newCurrency: string; previousBalance: string; newBalance: string }> {
+    const rate = new Decimal(bdtPerUsd);
+    if (!rate.isFinite() || rate.lte(0) || rate.gt(100000)) {
+      throw new BadRequestException('Enter a valid BDT-per-USD exchange rate');
+    }
+    const note = reason.trim();
+    if (note.length < 8 || note.length > 500) {
+      throw new BadRequestException('Provide an audit reason between 8 and 500 characters');
+    }
+
+    const wallet = await this.getWalletByUserId(userId);
+    if (wallet.currency === 'BDT') {
+      throw new ConflictException('This wallet is already denominated in BDT');
+    }
+    if (wallet.currency !== 'USD') {
+      throw new BadRequestException(`Only USD wallets can be migrated to BDT; found ${wallet.currency}`);
+    }
+
+    const usdSystemWalletId = await this.getOrCreateSystemWallet('SYSTEM', 'USD');
+    const bdtSystemWalletId = await this.getOrCreateSystemWallet('SYSTEM', 'BDT');
+    const reference = `currency-migration:${wallet.id}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM wallets WHERE id = ${wallet.id} FOR UPDATE`;
+      const current = await tx.wallet.findUnique({ where: { id: wallet.id } });
+      if (!current || current.currency !== 'USD') {
+        throw new ConflictException('Wallet currency changed; refresh and retry');
+      }
+      const prior = await tx.ledgerEntry.count({ where: { walletId: wallet.id } });
+      const existingMigration = await tx.transaction.findFirst({
+        where: { reference },
+        select: { id: true },
+      });
+      if (existingMigration) throw new ConflictException('A currency migration was already recorded');
+
+      const balance = await this.ledger.getBalanceWithLock(wallet.id, tx);
+      if (balance.isNegative()) {
+        throw new BadRequestException('Negative USD balances require manual accounting review before migration');
+      }
+      const converted = balance.mul(rate).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const metadata = {
+        action: 'ADMIN_APPROVED_CURRENCY_MIGRATION',
+        userId,
+        adminId,
+        from: 'USD',
+        to: 'BDT',
+        bdtPerUsd: rate.toString(),
+        reason: note,
+        historicalLedgerEntries: prior,
+        previousBalanceUsd: balance.toFixed(8),
+        convertedBalanceBdt: converted.toFixed(2),
+      };
+
+      if (balance.gt(0)) {
+        const usdTx = await tx.transaction.create({
+          data: {
+            type: 'MANUAL_DEBIT',
+            status: 'COMPLETED',
+            amount: balance.toFixed(8),
+            currency: 'USD',
+            reference: `${reference}:usd-close`,
+            description: 'USD balance closed for approved BDT wallet migration',
+            metadata: metadata as any,
+            initiatedBy: adminId,
+          },
+        });
+        await this.ledger.createDoubleEntry(tx, {
+          debitWalletId: wallet.id,
+          creditWalletId: usdSystemWalletId,
+          transactionId: usdTx.id,
+          amount: balance,
+          currency: 'USD',
+          description: 'Close legacy USD balance during currency migration',
+        });
+
+        if (converted.gt(0)) {
+          const bdtTx = await tx.transaction.create({
+            data: {
+              type: 'MANUAL_CREDIT',
+              status: 'COMPLETED',
+              amount: converted.toFixed(2),
+              currency: 'BDT',
+              reference: `${reference}:bdt-open`,
+              description: 'Converted opening BDT balance from approved USD migration',
+              metadata: metadata as any,
+              initiatedBy: adminId,
+            },
+          });
+          await this.ledger.createDoubleEntry(tx, {
+            debitWalletId: bdtSystemWalletId,
+            creditWalletId: wallet.id,
+            transactionId: bdtTx.id,
+            amount: converted,
+            currency: 'BDT',
+            description: 'Open converted BDT balance during currency migration',
+          });
+        }
+      }
+
+      await tx.wallet.update({ where: { id: wallet.id }, data: { currency: 'BDT' } });
+      return {
+        walletId: wallet.id,
+        previousCurrency: 'USD',
+        newCurrency: 'BDT',
+        previousBalance: balance.toFixed(2),
+        newBalance: converted.toFixed(2),
+      };
+    });
+  }
+
   async getWalletByUserId(userId: string): Promise<WalletSummary> {
     const wallet = await this.prisma.wallet.findUnique({
       where: { userId },
