@@ -9,6 +9,7 @@ import { PaymentMethodController } from './payment-method.controller';
 import { SslcommerzModule } from './sslcommerz/sslcommerz.module';
 import { BdGatewayModule } from './bdgateway/bdgateway.module';
 import { BdGatewayController } from './bdgateway/bdgateway.controller';
+import { BdGatewayAdminController, BdGatewayOptionsController } from './bdgateway/bdgateway-config.controller';
 import { TransactionModule } from '../transaction/transaction.module';
 import { WalletModule } from '../wallet/wallet.module';
 
@@ -18,6 +19,8 @@ import { WalletModule } from '../wallet/wallet.module';
   controllers: [
     DepositController,
     BdGatewayController,
+    BdGatewayAdminController,
+    BdGatewayOptionsController,
     WithdrawalController,
     WithdrawalAdminController,
     PaymentMethodController,
