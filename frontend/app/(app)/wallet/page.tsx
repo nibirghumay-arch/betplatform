@@ -69,7 +69,6 @@ function DepositCard() {
     setServerError('');
     try {
       const res = await api.post('/payment/deposit', {
-        userId: user!.id,
         amount: parseFloat(data.amount),
         currency: 'BDT',
         pspProvider: data.pspProvider,
@@ -222,7 +221,6 @@ function WithdrawCard() {
     setSuccess(false);
     try {
       await api.post('/payment/withdrawal', {
-        userId: user!.id,
         amount: parseFloat(data.amount),
         currency: 'BDT',
         pspProvider: 'sslcommerz',
