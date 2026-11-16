@@ -22,6 +22,7 @@ import { WithdrawalService } from './withdrawal.service';
 import {
   RequestWithdrawalDto,
   RejectWithdrawalDto,
+  MarkWithdrawalPaidDto,
   PaginationQueryDto,
 } from './dto/payment.dto';
 
@@ -108,6 +109,21 @@ export class WithdrawalAdminController {
   @HttpCode(HttpStatus.OK)
   approve(@Param('id') id: string, @Req() request: RequestWithUser) {
     return this.withdrawalService.approve(id, request.user.userId);
+  }
+
+
+  @Post(':id/mark-paid')
+  @HttpCode(HttpStatus.OK)
+  markPaid(
+    @Param('id') id: string,
+    @Body() dto: MarkWithdrawalPaidDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.markManuallyPaid(
+      id,
+      request.user.userId,
+      dto.payoutReference,
+    );
   }
 
   @Post(':id/reject')
