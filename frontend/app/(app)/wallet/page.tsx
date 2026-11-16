@@ -67,6 +67,10 @@ function DepositCard() {
 
   const onSubmit = async (data: DepositForm) => {
     setServerError('');
+    if (data.pspProvider === 'bdgateway' && !bdGatewayOptions?.enabled) {
+      setServerError('The BetPlatform BD gateway has not been configured by the site administrator yet.');
+      return;
+    }
     try {
       const res = await api.post('/payment/deposit', {
         amount: parseFloat(data.amount),
@@ -185,7 +189,12 @@ function DepositCard() {
           {serverError && (
             <p className="rounded-lg bg-red-900/30 px-3 py-2 text-sm text-red-400">{serverError}</p>
           )}
-          <Button type="submit" loading={isSubmitting} className="w-full">
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            disabled={isSubmitting || (pspProvider === 'bdgateway' && !bdGatewayOptions?.enabled)}
+            className="w-full"
+          >
             Deposit
           </Button>
         </form>
@@ -497,7 +506,7 @@ function TransactionHistory() {
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 export default function WalletPage() {
-  const { data: balance, isLoading } = useBalance();
+  const { data: balance, isLoading, isError: balanceError } = useBalance();
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
@@ -511,6 +520,11 @@ export default function WalletPage() {
         ) : (
           <p className="mt-1 text-4xl font-bold text-amber-400">
             {balance ? `৳ ${parseFloat(balance.balance).toFixed(2)}` : '—'}
+          </p>
+        )}
+        {balanceError && (
+          <p className="mt-2 text-xs text-red-400">
+            Balance service is unavailable. Refresh the page or contact support if this continues.
           </p>
         )}
       </div>
