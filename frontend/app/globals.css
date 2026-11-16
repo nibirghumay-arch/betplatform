@@ -86,7 +86,7 @@ main > div.mx-auto.px-6.py-6 {
   transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
 }
 
-.bp-card:hover {
+.bp-card::before {\n  content: "";\n  position: absolute;\n  inset: 0 0 auto;\n  height: 1px;\n  background: linear-gradient(90deg, transparent, rgba(67,224,208,.35), rgba(139,114,255,.48), transparent);\n  pointer-events: none;\n}\n\n.bp-card:hover {
   border-color: rgba(139, 114, 255, 0.28) !important;
   box-shadow: 0 22px 55px rgba(3, 7, 24, 0.30), 0 0 0 1px rgba(139, 114, 255, 0.035);
 }
@@ -226,4 +226,25 @@ main h2 { letter-spacing: -0.025em; }
 @media (max-width: 420px) {
   .bp-card { padding: 1rem; }
   main h1 { font-size: 1.5rem; }
+}
+
+.wallet-balance-hero {
+  position: relative;
+  overflow: hidden;
+}
+.wallet-balance-hero::after {
+  content: "";
+  position: absolute;
+  width: 15rem;
+  height: 15rem;
+  top: -9rem;
+  right: -3rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(67,224,208,.17), transparent 68%);
+  pointer-events: none;
+}
+.bp-chat-panel { animation: bp-pop 230ms cubic-bezier(.2,.8,.2,1) both; }
+.bp-chat-toggle { animation: bp-glow 3.8s ease-in-out infinite; }
+@media (max-width: 767px) {
+  .wallet-balance-hero { padding: 1.15rem; }
 }
