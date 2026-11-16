@@ -83,7 +83,7 @@ function DepositCard() {
           },
         }),
       });
-      if (res.data.paymentDetails?.depositId || res.data.depositId && res.data.paymentDetails) {
+      if (res.data.paymentDetails && res.data.depositId) {
         reset();
         router.push(`/wallet/deposit/pay/${res.data.depositId}`);
         return;
