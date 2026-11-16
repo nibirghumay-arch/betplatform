@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 
-const WITHDRAWAL_STATUSES = ['PENDING_REVIEW', 'PROCESSING', 'COMPLETED', 'REJECTED', 'FAILED'];
+const WITHDRAWAL_STATUSES = ['PENDING_KYC', 'PENDING_REVIEW', 'PROCESSING', 'COMPLETED', 'REJECTED', 'FAILED'];
 const PROVIDERS = [
   { value: 'BKASH', label: 'bKash' },
   { value: 'NAGAD', label: 'Nagad' },
@@ -72,6 +72,8 @@ export default function PaymentsPage() {
   const [depositPage, setDepositPage] = useState(0);
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [payoutTarget, setPayoutTarget] = useState<string | null>(null);
+  const [payoutReference, setPayoutReference] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [settingsNotice, setSettingsNotice] = useState('');
   const [copiedWebhook, setCopiedWebhook] = useState(false);
@@ -154,6 +156,22 @@ export default function PaymentsPage() {
   const handleApprove = (id: string) => {
     if (!admin) return;
     approve.mutate({ id, adminId: admin.id });
+  };
+
+  const markPaid = useMutation({
+    mutationFn: ({ id, payoutReference }: { id: string; payoutReference: string }) =>
+      api.post(`/admin/withdrawal/${id}/mark-paid`, { payoutReference }).then((r) => r.data),
+    onSuccess: () => {
+      setPayoutTarget(null);
+      setPayoutReference('');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'withdrawals'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+    },
+  });
+
+  const submitMarkPaid = () => {
+    if (!payoutTarget || payoutReference.trim().length < 4) return;
+    markPaid.mutate({ id: payoutTarget, payoutReference: payoutReference.trim() });
   };
 
   const handleReject = () => {
@@ -303,6 +321,9 @@ export default function PaymentsPage() {
         <Card>
           <div className="mb-5 flex flex-wrap items-center gap-2">
             <CardTitle>Withdrawal Queue</CardTitle>
+          <p className="mb-3 -mt-2 text-xs text-gray-500">
+            Approve a request, send the payout using the listed destination, then record its real transfer reference under PROCESSING → Mark as paid.
+          </p>
             <div className="flex flex-wrap gap-1.5">
               {WITHDRAWAL_STATUSES.map((status) => (
                 <button
@@ -333,9 +354,10 @@ export default function PaymentsPage() {
                     <th className="pb-2 pr-4">User</th>
                     <th className="pb-2 pr-4 text-right">Amount</th>
                     <th className="pb-2 pr-4">Provider</th>
+                    <th className="pb-2 pr-4">Payout destination</th>
                     <th className="pb-2 pr-4">Status</th>
                     <th className="pb-2 pr-4">Date</th>
-                    {withdrawalStatus === 'PENDING_REVIEW' && <th className="pb-2">Actions</th>}
+                    {(withdrawalStatus === 'PENDING_REVIEW' || withdrawalStatus === 'PENDING_KYC' || withdrawalStatus === 'PROCESSING') && <th className="pb-2">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -345,13 +367,33 @@ export default function PaymentsPage() {
                       <td className="py-2.5 pr-4 font-mono text-xs text-gray-300">{withdrawal.userId.slice(0, 8)}…</td>
                       <td className="py-2.5 pr-4 text-right font-mono text-amber-400">{withdrawal.currency} {Number(withdrawal.amount).toFixed(2)}</td>
                       <td className="py-2.5 pr-4 text-xs text-gray-400">{withdrawal.pspProvider}</td>
+                      <td className="max-w-[220px] py-2.5 pr-4 text-xs text-gray-300">
+                        {typeof withdrawal.payoutDetails?.type === 'string' ? withdrawal.payoutDetails.type : 'Account'}
+                        <p className="mt-0.5 break-all font-mono text-gray-500">
+                          {typeof withdrawal.payoutDetails?.accountNumber === 'string'
+                            ? withdrawal.payoutDetails.accountNumber
+                            : typeof withdrawal.payoutDetails?.iban === 'string'
+                              ? withdrawal.payoutDetails.iban
+                              : 'Details not supplied'}
+                        </p>
+                        {typeof withdrawal.payoutDetails?.accountHolder === 'string' && (
+                          <p className="text-gray-600">{withdrawal.payoutDetails.accountHolder}</p>
+                        )}
+                      </td>
                       <td className="py-2.5 pr-4"><Badge label={withdrawal.status} /></td>
                       <td className="py-2.5 pr-4 whitespace-nowrap text-xs text-gray-500">{new Date(withdrawal.createdAt).toLocaleDateString()}</td>
-                      {withdrawalStatus === 'PENDING_REVIEW' && (
+                      {(withdrawalStatus === 'PENDING_REVIEW' || withdrawalStatus === 'PENDING_KYC' || withdrawalStatus === 'PROCESSING') && (
                         <td className="py-2.5">
-                          <div className="flex gap-2">
-                            <Button size="sm" loading={approve.isPending} onClick={() => handleApprove(withdrawal.id)}>Approve</Button>
-                            <Button size="sm" variant="danger" onClick={() => setRejectTarget(withdrawal.id)}>Reject</Button>
+                          <div className="flex flex-wrap gap-2">
+                            {withdrawalStatus === 'PENDING_REVIEW' && (
+                              <Button size="sm" loading={approve.isPending} onClick={() => handleApprove(withdrawal.id)}>Approve</Button>
+                            )}
+                            {(withdrawalStatus === 'PENDING_REVIEW' || withdrawalStatus === 'PENDING_KYC') && (
+                              <Button size="sm" variant="danger" onClick={() => setRejectTarget(withdrawal.id)}>Reject</Button>
+                            )}
+                            {withdrawalStatus === 'PROCESSING' && (
+                              <Button size="sm" onClick={() => setPayoutTarget(withdrawal.id)}>Mark as paid</Button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -520,6 +562,34 @@ export default function PaymentsPage() {
               </Card>
             </>
           )}
+        </div>
+      )}
+
+      {payoutTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#16161f] p-6 shadow-2xl">
+            <h3 className="mb-2 text-lg font-semibold text-white">Record completed payout</h3>
+            <p className="mb-4 text-sm text-gray-400">
+              First send the money to the destination shown in the withdrawal row. Enter the actual bKash/Nagad/Rocket/bank transfer reference here. BetPlatform will then debit the user's wallet and mark the request completed.
+            </p>
+            <label className="mb-1 block text-sm text-gray-300">Payout TrxID / reference</label>
+            <input
+              value={payoutReference}
+              onChange={(event) => setPayoutReference(event.target.value)}
+              placeholder="Enter the transfer reference"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500"
+              maxLength={64}
+            />
+            {markPaid.isError && <p className="mt-3 text-sm text-red-400">{apiError(markPaid.error)}</p>}
+            <div className="mt-4 flex gap-3">
+              <Button loading={markPaid.isPending} disabled={payoutReference.trim().length < 4} onClick={submitMarkPaid} className="flex-1">
+                Confirm payout sent
+              </Button>
+              <Button variant="ghost" onClick={() => { setPayoutTarget(null); setPayoutReference(''); markPaid.reset(); }} className="flex-1">
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
