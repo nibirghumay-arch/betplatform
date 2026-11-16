@@ -505,7 +505,7 @@ export default function WalletPage() {
 
       {/* Balance hero */}
       <div className="mb-6 rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-900/20 to-amber-800/10 p-6">
-        <p className="text-sm text-amber-400/70">Available Balance</p>
+        <p className="text-sm text-amber-400/70">Available Balance (BDT)</p>
         {isLoading ? (
           <Spinner className="mt-2" />
         ) : (
