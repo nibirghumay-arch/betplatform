@@ -15,7 +15,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { WalletService } from './wallet.service';
-import { CreateWalletDto, MigrateWalletCurrencyDto } from './dto/wallet.dto';
+import { CreateWalletDto } from './dto/wallet.dto';
 
 interface RequestWithUser extends Request {
   user: { userId: string; role: string };
@@ -32,21 +32,6 @@ export class WalletController {
   @HttpCode(HttpStatus.CREATED)
   createWallet(@Body() dto: CreateWalletDto) {
     return this.walletService.createWallet(dto.userId, dto.currency);
-  }
-
-  @Post('admin/migrate-to-bdt')
-  @UseGuards(AdminRoleGuard)
-  @HttpCode(HttpStatus.OK)
-  migrateUserWalletToBdt(
-    @Body() dto: MigrateWalletCurrencyDto,
-    @Req() request: RequestWithUser,
-  ) {
-    return this.walletService.migrateUserWalletToBdt(
-      dto.userId,
-      request.user.userId,
-      dto.bdtPerUsd,
-      dto.reason,
-    );
   }
 
   @Get('user/:userId')
