@@ -23,11 +23,13 @@ import { SslCallbackBody } from './sslcommerz/sslcommerz.types';
 import { SslCommerzCallbackDto } from './dto/sslcommerz-callback.dto';
 import { InitiateDepositDto, DepositListQueryDto } from './dto/payment.dto';
 
+interface RequestWithUser extends Request {
+  user: { userId: string; email: string; role: string };
+}
+
 @ApiTags('Payment – Deposits')
 @ApiBearerAuth()
 @Controller('payment/deposit')
-interface RequestWithUser extends Request { user: { userId: string; role: string } };
-
 export class DepositController {
   constructor(
     private readonly depositService: DepositService,
@@ -35,12 +37,6 @@ export class DepositController {
     private readonly config: ConfigService,
   ) {}
 
-  /**
-   * Frontend calls this to start a deposit.
-   * Returns a PSP checkout URL — the user is redirected there to pay.
-   * Never trust the frontend to confirm payment: that comes from the PSP webhook
-   * (or, for SSLCommerz, the success/IPN endpoints below).
-   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   initiate(@Body() dto: InitiateDepositDto, @Req() request: RequestWithUser) {
@@ -52,17 +48,14 @@ export class DepositController {
       metadata: dto.metadata,
       mobileGateway: dto.mobileGateway,
       bdProvider: dto.bdProvider,
-      customer: dto.customer,
+      customer: dto.customer ?? {
+        name: request.user.email,
+        email: request.user.email,
+        phone: '',
+      },
     });
   }
 
-  /**
-   * PSP-to-server webhook (Stripe/PayPal-style: JSON body + HMAC signature).
-   * The raw body MUST be preserved for signature verification — JSON parsing
-   * is handled inside the service, not by NestJS middleware.
-   * Always returns 200 so the PSP does not retry unnecessarily on our errors.
-   * Public: this is called by the PSP's servers, never by a logged-in user.
-   */
   @Public()
   @Post('webhook/:provider')
   @HttpCode(HttpStatus.OK)
@@ -77,16 +70,6 @@ export class DepositController {
     await this.depositService.handleWebhook(provider, signature, rawBody);
     return { received: true };
   }
-
-  // ─── SSLCommerz callbacks ────────────────────────────────────────────────
-  //
-  // SSLCommerz does NOT sign these with a shared secret — it posts
-  // application/x-www-form-urlencoded data to success_url/fail_url/cancel_url
-  // via the customer's browser (redirect), and separately to ipn_url
-  // server-to-server. Both are treated as untrusted hints: we always call
-  // back into SSLCommerz's own Order Validation API before crediting a
-  // wallet (see SslcommerzService.validateTransaction). All four routes are
-  // @Public() since SSLCommerz/the customer's browser has no JWT.
 
   @Public()
   @ApiExcludeEndpoint()
@@ -112,13 +95,6 @@ export class DepositController {
     await this.handleSslcommerzRedirect(body, res, 'cancel');
   }
 
-  /**
-   * Server-to-server IPN — SSLCommerz calls this independently of whether
-   * the customer's browser ever makes it back to success_url. This is the
-   * authoritative confirmation path in production (browser redirects can be
-   * lost to closed tabs, flaky connections, etc.), so it performs the same
-   * validate-then-settle flow but responds with JSON, not a redirect.
-   */
   @Public()
   @ApiExcludeEndpoint()
   @Post('sslcommerz/ipn')
@@ -161,7 +137,6 @@ export class DepositController {
       await this.depositService.markSslcommerzFailed(body, 'Missing val_id in SSLCommerz callback');
       return;
     }
-
     try {
       await this.sslcommerz.validateTransaction(body.val_id, {
         tranId: body.tran_id,
