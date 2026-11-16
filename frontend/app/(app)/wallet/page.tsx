@@ -120,7 +120,7 @@ function DepositCard() {
             <label className="text-sm font-medium text-gray-300">Payment Method</label>
             <select
               {...register('pspProvider')}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+              className="gateway-select rounded-xl border border-white/10 bg-[#10172b]/80 px-3.5 py-2.5 text-sm text-white focus:border-cyan-300 focus:outline-none"
             >
               <option value="bdgateway" disabled={!bdGatewayOptions?.enabled}>
                 {bdGatewayOptions?.enabled ? 'bKash / Nagad / Rocket / Upay — BetPlatform checkout' : 'BetPlatform BD gateway — not configured'}
