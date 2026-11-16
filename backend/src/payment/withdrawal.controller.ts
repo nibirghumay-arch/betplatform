@@ -23,6 +23,7 @@ import {
   RequestWithdrawalDto,
   RejectWithdrawalDto,
   MarkWithdrawalPaidDto,
+  FailWithdrawalDto,
   PaginationQueryDto,
 } from './dto/payment.dto';
 
@@ -123,6 +124,20 @@ export class WithdrawalAdminController {
       id,
       request.user.userId,
       dto.payoutReference,
+    );
+  }
+
+  @Post(':id/fail-payout')
+  @HttpCode(HttpStatus.OK)
+  failPayout(
+    @Param('id') id: string,
+    @Body() dto: FailWithdrawalDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.failManualPayout(
+      id,
+      request.user.userId,
+      dto.reason,
     );
   }
 
