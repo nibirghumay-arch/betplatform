@@ -764,7 +764,9 @@ describe('DepositService', () => {
 
     it('rejects a pending deposit without crediting the wallet', async () => {
       const prisma = makePrisma();
-      prisma.deposit.findUnique.mockResolvedValue(pendingDeposit);
+      prisma.deposit.findUnique
+        .mockResolvedValueOnce(pendingDeposit)
+        .mockResolvedValueOnce({ ...pendingDeposit, status: DepositStatus.FAILED });
       prisma.deposit.update.mockResolvedValue({});
       prisma.deposit.updateMany.mockResolvedValue({ count: 1 });
       const transactionService = makeTransactionService();
@@ -776,7 +778,7 @@ describe('DepositService', () => {
         'admin-1',
       );
 
-      expect(result.status).toBe(DepositStatus.PENDING_PAYMENT); // findById mock still reflects the pre-update row
+      expect(result.status).toBe(DepositStatus.FAILED);
       expect(prisma.deposit.updateMany).toHaveBeenCalledWith(expect.objectContaining({
         data: {
           status: DepositStatus.FAILED,
