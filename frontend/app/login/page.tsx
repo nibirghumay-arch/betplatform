@@ -33,7 +33,12 @@ export default function LoginPage() {
     setServerError('');
     try {
       const res = await api.post('/auth/login', data);
-      setAuth(res.data.user, res.data.accessToken);
+      const user = res.data.user;
+      setAuth({
+        ...user,
+        status: user.status ?? (user.isActive ? 'ACTIVE' : 'INACTIVE'),
+        emailVerified: user.emailVerified ?? Boolean(user.emailVerifiedAt),
+      }, res.data.accessToken);
       router.push('/lobby');
     } catch (err) {
       setServerError(apiError(err));
