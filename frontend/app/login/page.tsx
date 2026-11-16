@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 
 const schema = z.object({
-  email: z.string().email('Invalid email'),
+  email: z.string().trim().email('Enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 type FormData = z.infer<typeof schema>;
@@ -57,6 +57,7 @@ export default function LoginPage() {
             <Input
               label="Email"
               type="email"
+              autoComplete="email"
               placeholder="you@example.com"
               error={errors.email?.message}
               {...register('email')}
@@ -64,6 +65,7 @@ export default function LoginPage() {
             <Input
               label="Password"
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••"
               error={errors.password?.message}
               {...register('password')}
