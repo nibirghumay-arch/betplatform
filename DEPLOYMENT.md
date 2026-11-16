@@ -94,11 +94,9 @@ Netlify insists on a publish directory; the site serves no static content.
 | `ALLOWED_ORIGIN` | `https://<frontend-site>.netlify.app` | yes |
 | `CRON_SECRET` | `openssl rand -hex 32` | yes |
 | `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `15m` / `7d` | defaults exist |
-| `BD_GATEWAY_URL` | `https://<gateway-site>.netlify.app` | for bKash/Nagad deposits |
-| `BD_GATEWAY_API_KEY` | merchant API key from the gateway admin | " |
-| `BD_GATEWAY_API_SECRET` | merchant API secret | " |
-| `BD_GATEWAY_WEBHOOK_SECRET` | merchant webhook secret | " |
+| `PAYMENT_CONFIG_ENCRYPTION_KEY` | `openssl rand -hex 32` (64 hex characters) | required to save gateway secrets from the site admin |
 | `BD_GATEWAY_TIMEOUT_MS` | `10000` | optional |
+| `BD_GATEWAY_URL` / `BD_GATEWAY_API_KEY` / `BD_GATEWAY_API_SECRET` / `BD_GATEWAY_WEBHOOK_SECRET` | optional legacy environment fallback; normally entered in BetPlatform Admin → Payments → Gateway Setup | optional |
 | `SSLCOMMERZ_STORE_ID` / `SSLCOMMERZ_STORE_PASSWORD` / `SSLCOMMERZ_LIVE` | SSLCommerz credentials | only for that provider |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | outbound email | optional |
 
@@ -122,43 +120,83 @@ SSLCommerz/gateway callback URLs are all built from them.
 `NEXT_PUBLIC_*` values are inlined at build time, so changing this requires a redeploy
 of the frontend site, not just a restart.
 
-## 4. Wire up the BD payment gateway
+## 4. Connect the private BD payment gateway
 
-Deploy the gateway first (see its own `DEPLOYMENT.md`), then in its admin UI:
+Deploy `paymentgw` first (see that repository's `DEPLOYMENT.md`). The gateway remains a
+separate service; BetPlatform connects to it using one dedicated merchant identity.
 
-1. **Receiving Accounts** — add the bKash/Nagad/Rocket/Upay numbers you own.
-2. **Merchants** — create one for this platform. The API key, API secret and webhook
-   secret are shown **once**; paste them into the backend site's environment as
-   `BD_GATEWAY_API_KEY`, `BD_GATEWAY_API_SECRET`, `BD_GATEWAY_WEBHOOK_SECRET`.
-3. Set that merchant's **webhook URL** to:
+1. In the gateway operator dashboard, create the receiving accounts you own and keep
+   the SMS-forwarder phone/device keys private. The gateway still receives the SMS and
+   performs its own TrxID/amount matching.
+2. Create **one dedicated merchant for BetPlatform**. When creating it, set its webhook
+   URL to:
 
    ```
    https://<backend-site>.netlify.app/api/v1/payment/deposit/bdgateway/webhook
    ```
 
+   Copy the merchant API key, API secret and webhook secret. These credentials are
+   shown by the gateway only once.
+3. In the backend Netlify site's environment, add
+   `PAYMENT_CONFIG_ENCRYPTION_KEY` using a fresh `openssl rand -hex 32` value. Keep
+   that 64-character key only in backend hosting secrets — never in Git or a
+   `NEXT_PUBLIC_*` variable.
+4. Deploy the backend and frontend. Sign in to BetPlatform with an administrator
+   account, open **Admin → Payments → Gateway Setup**, enter the gateway base URL and
+   merchant credentials, choose enabled providers and BDT deposit limits, then save.
+   BetPlatform encrypts the credentials with AES-256-GCM before storing them in its
+   own `system_settings` table. The admin screen only displays a masked API-key hint
+   and whether secrets are saved; it never returns the plaintext secrets.
+5. Copy the webhook URL shown in BetPlatform into the dedicated merchant's webhook
+   setting if it was not already entered when the merchant was created. Check that the
+   gateway merchant's webhook is active.
+
+**The customer experience is now hosted by BetPlatform.** The browser does not receive
+the gateway checkout URL, merchant API credentials, webhook secret, gateway admin URL,
+or gateway order reference. The backend talks to the gateway server-to-server.
+
 ### What a deposit looks like
 
-1. Player picks *bKash / Nagad / Rocket / Upay — Send Money* on `/wallet`, enters an
-   amount, submits. `POST /payment/deposit` with `pspProvider: "bdgateway"`.
-2. The backend creates a gateway order and returns its `checkoutUrl`; the browser goes
-   there. The gateway order reference is stored on the deposit as `pspSessionId`.
-3. The player sends the exact amount to the number shown, then pastes their TrxID.
-4. The forwarded SMS reaches the gateway, which auto-approves the order only when the
-   **TrxID and the exact amount** both match, and POSTs a signed `order.approved`
-   webhook to the backend.
-5. The backend verifies `X-Gateway-Signature` (HMAC-SHA256 over `${t}.${rawBody}`,
-   5-minute replay window), then — treating the webhook as a notification only —
-   **re-reads the order from the gateway API** before crediting, exactly as the
-   SSLCommerz integration re-validates through the Order Validation API. Crediting goes
-   through the same double-entry `settle()` path, keyed on `deposit:<id>`, so a replayed
-   or duplicated webhook cannot double-credit.
-6. Meanwhile the player is on `/wallet/deposit/result?status=pending&depositId=…`, which
-   polls `POST /payment/deposit/bdgateway/:depositId/reconcile` every 5s for up to
-   2.5 minutes. That endpoint re-reads the gateway order and applies it, so a late or
-   lost webhook still resolves without an admin.
+1. The player chooses the BetPlatform BD gateway method on `/wallet`, enters a BDT
+   amount and selects an enabled provider.
+2. BetPlatform creates the deposit record and gateway order on the backend. It saves
+   the public receiving number and payment instructions on that deposit, but does not
+   return the gateway's hosted checkout URL to the browser.
+3. The player is sent to BetPlatform's own `/wallet/deposit/pay/<depositId>` screen.
+   That page displays the receiving number, exact amount, instructions and TrxID form.
+4. The player sends the exact amount, then submits the TrxID inside BetPlatform. The
+   betting backend proxies that TrxID to the gateway; the browser never calls the
+   gateway API directly.
+5. The gateway matches the TrxID against the SMS forwarded from the receiving phone.
+   The gateway sends a signed webhook to BetPlatform when the order changes.
+6. BetPlatform verifies `X-Gateway-Signature` (HMAC-SHA256 over
+   `${t}.${rawBody}`, with a 5-minute replay window), then re-reads the order from the
+   gateway API and checks the reference, BDT currency and exact amount before crediting
+   the player's BDT wallet through the existing double-entry ledger. A replayed or
+   duplicated webhook cannot double-credit.
+7. The BetPlatform payment page polls its own backend reconciliation endpoint while the
+   deposit is pending. The Admin → Payments → Deposit Requests tab shows the deposit
+   status and lets an administrator request a fresh gateway status check.
 
-Because a signature alone is never treated as proof of payment, a leaked webhook secret
-cannot mint balance — only a real approved order on the gateway can.
+### What remains in the gateway operator dashboard
+
+The current gateway's merchant API supports creating orders, reading order status and
+submitting customer TrxIDs. It does **not** expose merchant-scoped APIs for managing
+receiving accounts, SMS-forwarder device keys, raw SMS logs or manual gateway-side
+order approvals. Those operator-only tasks remain in the gateway's own admin dashboard.
+BetPlatform customers are not given that dashboard URL or any gateway credentials.
+This integration does not modify the `paymentgw` repository.
+
+### Currency safety
+
+New player wallets are created in BDT. An unused legacy USD wallet with no ledger entries
+is converted to BDT when its first BDT deposit is initiated. Existing wallets with ledger
+history are intentionally not relabelled, because doing so would change the meaning of
+past balances and transactions; those accounts need an explicit accounting migration
+before accepting BDT deposits.
+
+A webhook signature is not treated as proof of payment. Only an approved order read
+back from the gateway can result in a wallet credit.
 
 ## 5. Verify
 
