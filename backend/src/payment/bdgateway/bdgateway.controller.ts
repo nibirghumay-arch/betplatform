@@ -30,7 +30,7 @@ class SubmitBdGatewayTrxDto {
 
   @IsOptional()
   @IsString()
-  @Matches(/^01[3-9]\\d{8}$/)
+  @Matches(/^01[3-9]\d{8}$/)
   customerMsisdn?: string;
 }
 
