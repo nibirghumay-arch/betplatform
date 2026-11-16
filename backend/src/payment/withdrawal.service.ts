@@ -513,6 +513,57 @@ export class WithdrawalService {
   }
 
   private async markFailed(withdrawalId: string, reason: string): Promise<void> {
+    const withdrawal = await this.prisma.withdrawal.findUnique({
+      where: { id: withdrawalId },
+    });
+
+    if (!withdrawal || [
+      WithdrawalStatus.COMPLETED,
+      WithdrawalStatus.FAILED,
+      WithdrawalStatus.CANCELLED,
+      WithdrawalStatus.REJECTED,
+    ].includes(withdrawal.status)) {
+      return;
+    }
+
+    // Funds were reserved from the player's wallet when an admin approved
+    // this withdrawal. If the external payout fails, release the reserve back
+    // to the same wallet using a unique reversal transaction reference.
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    const reversalReference = `withdrawal-reversal:${withdrawal.id}`;
+    let reservation = withdrawal.transactionId
+      ? { id: withdrawal.transactionId }
+      : await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+
+    if (reservation) {
+      let reversal = await this.prisma.transaction.findUnique({
+        where: { reference: reversalReference },
+        select: { id: true },
+      });
+      if (!reversal) {
+        try {
+          const result = await this.transactionService.manualCredit({
+            userId: withdrawal.userId,
+            adminId: withdrawal.reviewedBy ?? 'system',
+            amount: new Decimal(withdrawal.amount.toString()),
+            reference: reversalReference,
+            description: 'Release reserved funds after failed withdrawal payout',
+            metadata: { withdrawalId: withdrawal.id, failureReason: reason },
+          });
+          reversal = { id: result.transactionId };
+        } catch (error) {
+          reversal = await this.prisma.transaction.findUnique({
+            where: { reference: reversalReference },
+            select: { id: true },
+          });
+          if (!reversal) throw error;
+        }
+      }
+    }
+
     await this.prisma.withdrawal.updateMany({
       where: {
         id: withdrawalId,
