@@ -198,6 +198,12 @@ before accepting BDT deposits.
 A webhook signature is not treated as proof of payment. Only an approved order read
 back from the gateway can result in a wallet credit.
 
+The gateway project handles incoming Send Money deposits; it does not expose a merchant
+payout API. Withdrawal requests are recorded and reviewed in BetPlatform Admin →
+Payments → Withdrawal Queue. The current withdrawal approval implementation queues the
+request for processing; the actual bKash/Nagad/Rocket/Upay payout is still performed
+manually by the operator.
+
 ## 5. Verify
 
 ```bash
