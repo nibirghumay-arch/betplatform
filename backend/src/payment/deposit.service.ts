@@ -345,7 +345,7 @@ export class DepositService {
     if (!/^[A-Za-z0-9]{6,20}$/.test(trxId.trim())) {
       throw new BadRequestException('Enter a valid 6–20 character TrxID');
     }
-    if (customerMsisdn && !/^01[3-9]\\d{8}$/.test(customerMsisdn)) {
+    if (customerMsisdn && !/^01[3-9]\d{8}$/.test(customerMsisdn)) {
       throw new BadRequestException('Enter a valid Bangladeshi mobile number');
     }
 
