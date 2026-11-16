@@ -124,8 +124,8 @@ export default function LobbyPage() {
           className={clsx(
             'flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
             activeCategory === ALL
-              ? 'bg-amber-500 text-black'
-              : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white',
+              ? 'bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 text-white shadow-lg shadow-violet-950/25'
+              : 'border border-white/10 bg-white/[0.035] text-slate-300 hover:border-violet-300/25 hover:bg-violet-400/10 hover:text-white',
           )}
         >
           All Games
@@ -149,7 +149,7 @@ export default function LobbyPage() {
       {/* Featured section — only shown on "All" tab with no search */}
       {activeCategory === ALL && !search && featured.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-400">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-rose-300">
             Featured
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
