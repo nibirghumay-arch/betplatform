@@ -81,13 +81,13 @@ describe('WalletService', () => {
 
     it('defaults currency to BDT', async () => {
       (prisma.wallet.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.wallet.create as jest.Mock).mockResolvedValue({ ...WALLET_STUB, currency: 'USD' });
+      (prisma.wallet.create as jest.Mock).mockResolvedValue({ ...WALLET_STUB, currency: 'BDT' });
 
       await service.createWallet('user-1');
 
       expect(prisma.wallet.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ currency: 'USD' }),
+          data: expect.objectContaining({ currency: 'BDT' }),
         }),
       );
     });
@@ -134,7 +134,7 @@ describe('WalletService', () => {
 
       expect(result.walletId).toBe('wallet-abc');
       expect(result.balance).toBe('123.46');
-      expect(result.currency).toBe('USD');
+      expect(result.currency).toBe('BDT');
     });
   });
 
