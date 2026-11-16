@@ -57,6 +57,11 @@ export class WithdrawalService {
     // Validate wallet state — hard checks.
     const wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== currency) {
+      throw new BadRequestException(
+        `Your wallet is denominated in ${wallet.currency}; this withdrawal is denominated in ${currency}.`,
+      );
+    }
 
     // Advisory balance check — the hard locked check happens in transactionService.withdraw()
     // at settlement time. This is an early-fail for UX.
@@ -127,9 +132,43 @@ export class WithdrawalService {
       );
     }
 
-    // Stub: in production this calls the PSP SDK to initiate a payout.
-    const pspPayoutId = `payout_${uuidv4()}`;
+    // Reserve the requested funds when the administrator approves the
+    // payout. This prevents the player from wagering the amount while the
+    // operator is sending it manually or waiting for an external PSP.
+    const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
+    await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== withdrawal.currency) {
+      throw new BadRequestException(
+        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
+      );
+    }
 
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    let transaction = await this.prisma.transaction.findUnique({
+      where: { reference: ledgerReference },
+      select: { id: true },
+    });
+    if (!transaction) {
+      try {
+        const result = await this.transactionService.withdraw({
+          userId: withdrawal.userId,
+          amount: new Decimal(withdrawal.amount.toString()),
+          reference: ledgerReference,
+          description: `Withdrawal reserve via ${withdrawal.pspProvider}`,
+          metadata: { withdrawalId: withdrawal.id, reservedBy: adminId },
+          initiatedBy: adminId,
+        });
+        transaction = { id: result.transactionId };
+      } catch (error) {
+        transaction = await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+        if (!transaction) throw error;
+      }
+    }
+
+    const pspPayoutId = `payout_${uuidv4()}`;
     await this.prisma.withdrawal.update({
       where: { id: withdrawalId },
       data: {
@@ -137,12 +176,139 @@ export class WithdrawalService {
         reviewedBy: adminId,
         reviewedAt: new Date(),
         pspPayoutId,
+        transactionId: transaction.id,
       },
     });
 
     this.logger.log(
       `Withdrawal approved: id=${withdrawalId} admin=${adminId} pspPayoutId=${pspPayoutId}`,
     );
+  }
+
+  /**
+   * Complete a withdrawal after the operator has sent the money manually.
+   * The site's payment gateway currently has no payout API, so this records
+   * the operator's real transfer reference and debits the wallet exactly once.
+   */
+  async markManuallyPaid(
+    withdrawalId: string,
+    adminId: string,
+    payoutReference: string,
+  ): Promise<{ withdrawalId: string; status: WithdrawalStatus; transactionId: string }> {
+    const normalizedReference = payoutReference.trim();
+    if (normalizedReference.length < 4 || normalizedReference.length > 64) {
+      throw new BadRequestException('Enter a valid payout transaction/reference ID');
+    }
+
+    const withdrawal = await this.findById(withdrawalId);
+    if (withdrawal.status === WithdrawalStatus.COMPLETED && withdrawal.transactionId) {
+      return {
+        withdrawalId,
+        status: withdrawal.status,
+        transactionId: withdrawal.transactionId,
+      };
+    }
+    if (withdrawal.status !== WithdrawalStatus.PROCESSING) {
+      throw new BadRequestException(
+        `Withdrawal ${withdrawalId} must be approved and in PROCESSING before it can be marked paid`,
+      );
+    }
+
+    const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
+    await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== withdrawal.currency) {
+      throw new BadRequestException(
+        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
+      );
+    }
+
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    let transaction = withdrawal.transactionId
+      ? { id: withdrawal.transactionId }
+      : await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+
+    // A retry after an interrupted admin action reuses the already-created
+    // ledger transaction rather than debiting the wallet twice.
+    if (!transaction) {
+      try {
+        const result = await this.transactionService.withdraw({
+          userId: withdrawal.userId,
+          amount: new Decimal(withdrawal.amount.toString()),
+          reference: ledgerReference,
+          description: `Manual payout via ${withdrawal.pspProvider}`,
+          metadata: {
+            withdrawalId: withdrawal.id,
+            manualPayoutReference: normalizedReference,
+            markedPaidBy: adminId,
+          },
+          initiatedBy: adminId,
+        });
+        transaction = { id: result.transactionId };
+      } catch (error) {
+        // Handle concurrent double-clicks / retries. The transaction reference
+        // is unique, so a second request can recover the winner's transaction.
+        transaction = await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+        if (!transaction) throw error;
+      }
+    }
+
+    await this.prisma.withdrawal.updateMany({
+      where: {
+        id: withdrawal.id,
+        status: WithdrawalStatus.PROCESSING,
+        transactionId: withdrawal.transactionId ?? null,
+      },
+      data: {
+        status: WithdrawalStatus.COMPLETED,
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+        pspReference: normalizedReference,
+        transactionId: transaction.id,
+      },
+    });
+
+    const completed = await this.findById(withdrawalId);
+    if (completed.status !== WithdrawalStatus.COMPLETED || completed.transactionId !== transaction.id) {
+      throw new BadRequestException('Withdrawal status changed while the payout was being recorded');
+    }
+
+    this.logger.warn(
+      `Manual withdrawal completed: id=${withdrawalId} admin=${adminId} payoutReference=${normalizedReference} txId=${transaction.id}`,
+    );
+    return {
+      withdrawalId,
+      status: completed.status,
+      transactionId: transaction.id,
+    };
+  }
+
+  /** Mark an unsent/failed manual payout as failed and release its reserve. */
+  async failManualPayout(
+    withdrawalId: string,
+    adminId: string,
+    reason: string,
+  ): Promise<{ withdrawalId: string; status: WithdrawalStatus }> {
+    const withdrawal = await this.findById(withdrawalId);
+    if (withdrawal.status !== WithdrawalStatus.PROCESSING) {
+      throw new BadRequestException('Only a PROCESSING withdrawal can be failed by an administrator');
+    }
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 4 || normalizedReason.length > 500) {
+      throw new BadRequestException('Enter a reason between 4 and 500 characters');
+    }
+
+    await this.markFailed(
+      withdrawalId,
+      `Manual payout marked failed by ${adminId}: ${normalizedReason}`,
+    );
+    const updated = await this.findById(withdrawalId);
+    return { withdrawalId, status: updated.status };
   }
 
   // ─── Admin: reject ──────────────────────────────────────────────────────────
@@ -327,18 +493,26 @@ export class WithdrawalService {
     const amount = new Decimal(withdrawal.amount.toString());
 
     try {
-      const txResult = await this.transactionService.withdraw({
-        userId: withdrawal.userId,
-        amount,
-        reference: `withdrawal:${withdrawal.id}`,
-        description: `Withdrawal via ${withdrawal.pspProvider}`,
-        metadata: {
-          withdrawalId: withdrawal.id,
-          pspPayoutId,
-          pspReference,
-          ...webhookData,
-        },
-      });
+      const existingTransaction = withdrawal.transactionId
+        ? { id: withdrawal.transactionId }
+        : await this.prisma.transaction.findUnique({
+            where: { reference: `withdrawal:${withdrawal.id}` },
+            select: { id: true },
+          });
+      const txResult = existingTransaction
+        ? { transactionId: existingTransaction.id }
+        : await this.transactionService.withdraw({
+            userId: withdrawal.userId,
+            amount,
+            reference: `withdrawal:${withdrawal.id}`,
+            description: `Withdrawal via ${withdrawal.pspProvider}`,
+            metadata: {
+              withdrawalId: withdrawal.id,
+              pspPayoutId,
+              pspReference,
+              ...webhookData,
+            },
+          });
 
       await this.prisma.withdrawal.update({
         where: { id: withdrawal.id },
@@ -362,6 +536,58 @@ export class WithdrawalService {
   }
 
   private async markFailed(withdrawalId: string, reason: string): Promise<void> {
+    const withdrawal = await this.prisma.withdrawal.findUnique({
+      where: { id: withdrawalId },
+    });
+
+    if (
+      !withdrawal ||
+      withdrawal.status === WithdrawalStatus.COMPLETED ||
+      withdrawal.status === WithdrawalStatus.FAILED ||
+      withdrawal.status === WithdrawalStatus.CANCELLED ||
+      withdrawal.status === WithdrawalStatus.REJECTED
+    ) {
+      return;
+    }
+
+    // Funds were reserved from the player's wallet when an admin approved
+    // this withdrawal. If the external payout fails, release the reserve back
+    // to the same wallet using a unique reversal transaction reference.
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    const reversalReference = `withdrawal-reversal:${withdrawal.id}`;
+    let reservation = withdrawal.transactionId
+      ? { id: withdrawal.transactionId }
+      : await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+
+    if (reservation) {
+      let reversal = await this.prisma.transaction.findUnique({
+        where: { reference: reversalReference },
+        select: { id: true },
+      });
+      if (!reversal) {
+        try {
+          const result = await this.transactionService.manualCredit({
+            userId: withdrawal.userId,
+            adminId: withdrawal.reviewedBy ?? 'system',
+            amount: new Decimal(withdrawal.amount.toString()),
+            reference: reversalReference,
+            description: 'Release reserved funds after failed withdrawal payout',
+            metadata: { withdrawalId: withdrawal.id, failureReason: reason },
+          });
+          reversal = { id: result.transactionId };
+        } catch (error) {
+          reversal = await this.prisma.transaction.findUnique({
+            where: { reference: reversalReference },
+            select: { id: true },
+          });
+          if (!reversal) throw error;
+        }
+      }
+    }
+
     await this.prisma.withdrawal.updateMany({
       where: {
         id: withdrawalId,

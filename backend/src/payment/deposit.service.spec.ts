@@ -14,6 +14,19 @@ function makePrisma(overrides: Record<string, any> = {}) {
       findUnique: jest.fn(),
       findMany: jest.fn(),
     },
+    ledgerEntry: {
+      count: jest.fn().mockResolvedValue(0),
+    },
+    wallet: {
+      update: jest.fn().mockImplementation(async ({ where, data }) => ({
+        id: where.id,
+        userId: 'user-1',
+        currency: data.currency,
+        walletType: 'USER',
+        isActive: true,
+        isFrozen: false,
+      })),
+    },
     ...overrides,
   } as any;
 }
@@ -55,6 +68,34 @@ function makeSslcommerz(overrides: Record<string, any> = {}) {
   } as any;
 }
 
+function makeBdGateway(overrides: Record<string, any> = {}) {
+  return {
+    createOrder: jest.fn().mockResolvedValue({
+      reference: 'gw-order-1',
+      checkoutUrl: 'https://gateway.example/checkout/gw-order-1',
+      status: 'PENDING',
+      amountBdt: 100,
+      provider: 'BKASH',
+      receivingNumber: '01712345678',
+      expiresAt: '2026-11-16T18:00:00.000Z',
+    }),
+    getOrder: jest.fn().mockResolvedValue(null),
+    submitTrxId: jest.fn().mockResolvedValue({ status: 'SUBMITTED', message: 'received' }),
+    ...overrides,
+  } as any;
+}
+
+function makeBdtWalletService() {
+  return makeWalletService({
+    getWalletByUserId: jest.fn().mockResolvedValue({
+      id: 'wallet-1',
+      currency: 'BDT',
+      isActive: true,
+      isFrozen: false,
+    }),
+  });
+}
+
 function makeConfig(overrides: Record<string, any> = {}) {
   return {
     get: jest.fn((key: string) => overrides[key]),
@@ -67,9 +108,12 @@ function makeService({
   transactionService = makeTransactionService(),
   pspSignature = makePspSignature(),
   sslcommerz = makeSslcommerz(),
+  bdGateway = makeBdGateway(),
   config = makeConfig(),
 } = {}) {
-  return new DepositService(prisma, transactionService, walletService, pspSignature, sslcommerz, config);
+  return new DepositService(
+    prisma, transactionService, walletService, pspSignature, sslcommerz, bdGateway, config,
+  );
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -397,7 +441,7 @@ describe('DepositService', () => {
 
       const svc = makeService({ prisma });
       const result = await svc.listByUser('user-1', 0, 10);
-      expect(result).toBe(deposits);
+      expect(result).toEqual(deposits);
       expect(prisma.deposit.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: 'user-1' }, skip: 0, take: 10 }),
       );
@@ -414,7 +458,7 @@ describe('DepositService', () => {
       prisma.deposit.update.mockResolvedValue({});
       const sslcommerz = makeSslcommerz();
 
-      const svc = makeService({ prisma, sslcommerz });
+      const svc = makeService({ prisma, sslcommerz, walletService: makeBdtWalletService() });
       const result = await svc.initiate({
         userId: 'user-1',
         amount: '500',
@@ -439,9 +483,9 @@ describe('DepositService', () => {
         createSession: jest.fn().mockRejectedValue(new Error('gateway down')),
       });
 
-      const svc = makeService({ prisma, sslcommerz });
+      const svc = makeService({ prisma, sslcommerz, walletService: makeBdtWalletService() });
       await expect(
-        svc.initiate({ userId: 'user-1', amount: '500', pspProvider: 'sslcommerz' }),
+        svc.initiate({ userId: 'user-1', amount: '500', currency: 'BDT', pspProvider: 'sslcommerz' }),
       ).rejects.toThrow('gateway down');
 
       expect(prisma.deposit.update).toHaveBeenCalledWith(
@@ -450,6 +494,50 @@ describe('DepositService', () => {
           data: expect.objectContaining({ status: DepositStatus.FAILED }),
         }),
       );
+    });
+  });
+
+  describe('initiate (bdgateway provider)', () => {
+    it('creates a gateway order but returns only BetPlatform payment instructions', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.create.mockResolvedValue({ id: 'dep-bd-1', pspProvider: 'bdgateway' });
+      prisma.deposit.update.mockResolvedValue({});
+      const bdGateway = makeBdGateway();
+
+      const svc = makeService({ prisma, walletService: makeBdtWalletService(), bdGateway });
+      const result = await svc.initiate({
+        userId: 'user-1',
+        amount: '100.00',
+        currency: 'BDT',
+        pspProvider: 'bdgateway',
+        bdProvider: 'BKASH',
+      });
+
+      expect(bdGateway.createOrder).toHaveBeenCalledWith(expect.objectContaining({
+        amountBdt: 100,
+        provider: 'BKASH',
+        metadata: { depositId: 'dep-bd-1', userId: 'user-1' },
+      }));
+      expect(result.depositId).toBe('dep-bd-1');
+      expect(result.paymentDetails).toEqual({
+        provider: 'BKASH',
+        receivingNumber: '01712345678',
+        amountBdt: 100,
+        currency: 'BDT',
+      });
+      expect(result).not.toHaveProperty('checkoutUrl');
+      expect(prisma.deposit.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          pspSessionId: 'gw-order-1',
+          paymentChannel: 'bKash',
+          metadata: expect.objectContaining({
+            bdGateway: expect.objectContaining({
+              receivingNumber: '01712345678',
+              currency: 'BDT',
+            }),
+          }),
+        }),
+      }));
     });
   });
 

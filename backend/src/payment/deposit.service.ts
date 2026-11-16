@@ -55,8 +55,14 @@ export interface InitiateDepositParams {
 
 export interface InitiateDepositResult {
   depositId: string;
-  checkoutUrl: string;
+  checkoutUrl?: string;
   expiresAt: Date;
+  paymentDetails?: {
+    provider: BdGatewayProvider;
+    receivingNumber: string;
+    amountBdt: number;
+    currency: 'BDT';
+  };
 }
 
 @Injectable()
@@ -79,8 +85,29 @@ export class DepositService {
     const amount = this.parseAmount(params.amount);
     const currency = params.currency ?? 'USD';
 
-    const wallet = await this.walletService.getWalletByUserId(params.userId);
+    let wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
+
+    // Migrate only truly unused legacy USD wallets. A wallet with ledger
+    // history must never be relabelled because that would rewrite the meaning
+    // of previous balances and transactions.
+    if (currency === 'BDT' && wallet.currency === 'USD') {
+      const priorEntries = await this.prisma.ledgerEntry.count({ where: { walletId: wallet.id } });
+      if (priorEntries === 0) {
+        wallet = await this.prisma.wallet.update({
+          where: { id: wallet.id },
+          data: { currency: 'BDT' },
+          select: {
+            id: true, userId: true, currency: true, walletType: true, isActive: true, isFrozen: true,
+          },
+        });
+      }
+    }
+    if (wallet.currency !== currency) {
+      throw new BadRequestException(
+        `Your wallet is denominated in ${wallet.currency}; this deposit is denominated in ${currency}. This account has previous ledger activity and needs an administrator-approved currency migration before BDT deposits can be accepted.`,
+      );
+    }
 
     const deposit = await this.prisma.deposit.create({
       data: {
@@ -240,9 +267,21 @@ export class DepositService {
       await this.prisma.deposit.update({
         where: { id: depositId },
         data: {
-          // The gateway's order reference is our handle on the session.
+          // Only the merchant order reference and public receiving instructions
+          // are stored. No API key, API secret, or webhook secret is persisted
+          // in a customer-visible field.
           pspSessionId: order.reference,
           paymentChannel: BD_PROVIDER_LABELS[provider],
+          metadata: {
+            ...(params.metadata ?? {}),
+            bdGateway: {
+              provider,
+              receivingNumber: order.receivingNumber,
+              amountBdt: order.amountBdt,
+              currency: 'BDT',
+              expiresAt: order.expiresAt,
+            },
+          } as any,
         },
       });
 
@@ -250,7 +289,18 @@ export class DepositService {
         `BD gateway deposit initiated: id=${depositId} userId=${params.userId} amount=${amount.toFixed(2)} provider=${provider} ref=${order.reference}`,
       );
 
-      return { depositId, checkoutUrl: order.checkoutUrl, expiresAt: new Date(order.expiresAt) };
+      // Do not send the provider's hosted checkout URL to the browser. The
+      // customer completes the instructions and TrxID submission on BetPlatform.
+      return {
+        depositId,
+        expiresAt: new Date(order.expiresAt),
+        paymentDetails: {
+          provider,
+          receivingNumber: order.receivingNumber,
+          amountBdt: order.amountBdt,
+          currency: 'BDT',
+        },
+      };
     } catch (err) {
       await this.markFailed(depositId, (err as Error).message);
       throw err;
@@ -277,11 +327,67 @@ export class DepositService {
     await this.applyBdGatewayOrder(order, payload.metadata ?? null);
   }
 
+  /** Customer submits a TrxID from the BetPlatform-hosted payment screen. */
+  async submitBdGatewayTrx(
+    depositId: string,
+    userId: string,
+    trxId: string,
+    customerMsisdn?: string,
+  ): Promise<{ status: string; message: string }> {
+    const deposit = await this.findById(depositId);
+    if (deposit.userId !== userId) throw new NotFoundException('Deposit not found');
+    if (deposit.pspProvider !== BDGATEWAY_PROVIDER || !deposit.pspSessionId) {
+      throw new BadRequestException('This deposit does not have an active BD gateway order');
+    }
+    if (deposit.status !== DepositStatus.PENDING_PAYMENT && deposit.status !== DepositStatus.PROCESSING) {
+      throw new BadRequestException(`This deposit is already ${deposit.status.toLowerCase()}`);
+    }
+    if (!/^[A-Za-z0-9]{6,20}$/.test(trxId.trim())) {
+      throw new BadRequestException('Enter a valid 6–20 character TrxID');
+    }
+    if (customerMsisdn && !/^01[3-9]\d{8}$/.test(customerMsisdn)) {
+      throw new BadRequestException('Enter a valid Bangladeshi mobile number');
+    }
+
+    await this.bdGateway.submitTrxId(deposit.pspSessionId, trxId.trim(), customerMsisdn);
+    const order = await this.bdGateway.getOrder(deposit.pspSessionId);
+    if (order) await this.applyBdGatewayOrder(order, { depositId });
+
+    const refreshed = await this.prisma.deposit.findUnique({ where: { id: depositId } });
+    return {
+      status: refreshed?.status ?? 'PENDING_PAYMENT',
+      message: refreshed?.status === DepositStatus.COMPLETED
+        ? 'Payment verified. Your wallet has been credited.'
+        : 'TrxID submitted. Your payment is being verified; this page will update automatically.',
+    };
+  }
+
+  async getAdminDepositQueue(status?: DepositStatus, skip = 0, take = 50) {
+    return this.prisma.deposit.findMany({
+      where: status ? { status } : undefined,
+      include: {
+        user: { select: { id: true, email: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: Math.min(Math.max(take, 1), 100),
+    });
+  }
+
+  async reconcileBdGatewayDepositAsAdmin(depositId: string) {
+    const deposit = await this.findById(depositId);
+    return this.reconcileBdGatewayDeposit(depositId, deposit.userId);
+  }
+
   /** Re-check one deposit against the gateway — for late or lost webhooks. */
   async reconcileBdGatewayDeposit(
     depositId: string,
+    userId: string,
   ): Promise<{ depositId: string; status: string; gatewayStatus: string }> {
     const deposit = await this.findById(depositId);
+    if (deposit.userId !== userId) {
+      throw new NotFoundException(`Deposit ${depositId} not found`);
+    }
 
     if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
       throw new BadRequestException(
@@ -317,14 +423,26 @@ export class DepositService {
       this.logger.warn(`No deposit matches gateway order ${order.reference}`);
       return;
     }
+    if (deposit.pspSessionId !== order.reference) {
+      this.logger.error(`BD gateway order reference mismatch for deposit ${deposit.id}`);
+      return;
+    }
+    if (
+      (order.currency ?? '').toUpperCase() !== 'BDT' ||
+      !new Decimal(order.amountBdt).equals(new Decimal(deposit.amount.toString()))
+    ) {
+      this.logger.error(`BD gateway amount/currency mismatch for deposit ${deposit.id}; refusing settlement`);
+      await this.markFailed(deposit.id, 'Gateway amount or currency did not match the original deposit request');
+      return;
+    }
 
     if (order.status === 'APPROVED') {
       // The gateway only approves when a forwarded SMS matches BOTH the TrxID
       // and the exact amount, so order.amountBdt is what actually arrived.
       await this.settle(
         order.submittedTrxId || order.reference,
-        new Decimal(order.amountBdt),
-        (order.currency ?? 'BDT').toUpperCase(),
+        new Decimal(deposit.amount.toString()),
+        'BDT',
         deposit.id,
         {
           gatewayReference: order.reference,
@@ -401,12 +519,15 @@ export class DepositService {
   }
 
   async listByUser(userId: string, skip = 0, take = 50) {
-    return this.prisma.deposit.findMany({
+    const deposits = await this.prisma.deposit.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       skip,
       take,
     });
+    // The gateway order reference is a backend-only identifier. Customers
+    // need the public payment instructions, not the merchant-side reference.
+    return deposits.map(({ pspSessionId: _gatewayOrderReference, ...deposit }) => deposit);
   }
 
   // ─── Private: event routing ─────────────────────────────────────────────────

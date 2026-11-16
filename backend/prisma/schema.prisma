@@ -155,7 +155,7 @@ model Wallet {
   id            String        @id @default(cuid())
   userId        String?       @unique @map("user_id")
   walletType    WalletType    @default(USER) @map("wallet_type")
-  currency      String        @default("USD")
+  currency      String        @default("BDT")
   isActive      Boolean       @default(true) @map("is_active")
   isFrozen      Boolean       @default(false) @map("is_frozen")
   createdAt     DateTime      @default(now()) @map("created_at")

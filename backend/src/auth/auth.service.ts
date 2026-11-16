@@ -74,7 +74,7 @@ export class AuthService {
           const wallet = await tx.wallet.findUnique({ where: { userId: user.id }, select: { id: true } });
           if (!wallet) {
             await tx.wallet.create({
-              data: { userId: user.id, walletType: WalletType.USER, currency: 'USD' },
+              data: { userId: user.id, walletType: WalletType.USER, currency: 'BDT' },
               select: { id: true },
             });
           }
@@ -111,7 +111,7 @@ export class AuthService {
         });
 
         await tx.wallet.create({
-          data: { userId: user.id, walletType: WalletType.USER, currency: 'USD' },
+          data: { userId: user.id, walletType: WalletType.USER, currency: 'BDT' },
           select: { id: true },
         });
 

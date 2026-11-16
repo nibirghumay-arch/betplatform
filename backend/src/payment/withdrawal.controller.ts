@@ -9,20 +9,27 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WithdrawalStatus } from '@prisma/client';
 import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { WithdrawalService } from './withdrawal.service';
 import {
   RequestWithdrawalDto,
-  ApproveWithdrawalDto,
   RejectWithdrawalDto,
-  CancelWithdrawalDto,
+  MarkWithdrawalPaidDto,
+  FailWithdrawalDto,
   PaginationQueryDto,
 } from './dto/payment.dto';
+
+interface RequestWithUser extends Request {
+  user: { userId: string; email: string; role: string };
+}
 
 @ApiTags('Payment – Withdrawals')
 @ApiBearerAuth()
@@ -32,9 +39,9 @@ export class WithdrawalController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  request(@Body() dto: RequestWithdrawalDto) {
+  request(@Body() dto: RequestWithdrawalDto, @Req() request: RequestWithUser) {
     return this.withdrawalService.request({
-      userId: dto.userId,
+      userId: request.user.userId,
       amount: dto.amount,
       currency: dto.currency,
       pspProvider: dto.pspProvider,
@@ -46,16 +53,10 @@ export class WithdrawalController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  cancel(@Param('id') id: string, @Body() dto: CancelWithdrawalDto) {
-    return this.withdrawalService.cancel(id, dto.userId);
+  cancel(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.withdrawalService.cancel(id, request.user.userId);
   }
 
-  /**
-   * PSP-to-server webhook confirming payout settled.
-   * The ledger debit is recorded here — not on approval.
-   * Public: called by the PSP's servers, never by a logged-in user, so it
-   * must bypass the global JwtAuthGuard.
-   */
   @Public()
   @Post('webhook/:provider')
   @HttpCode(HttpStatus.OK)
@@ -72,23 +73,23 @@ export class WithdrawalController {
   }
 
   @Get()
-  list(
-    @Query('userId') userId: string,
-    @Query() pagination: PaginationQueryDto,
-  ) {
-    return this.withdrawalService.listByUser(userId, pagination.skip, pagination.take);
+  list(@Query() pagination: PaginationQueryDto, @Req() request: RequestWithUser) {
+    return this.withdrawalService.listByUser(request.user.userId, pagination.skip, pagination.take);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.withdrawalService.findById(id);
+  async findOne(@Param('id') id: string, @Req() request: RequestWithUser) {
+    const withdrawal = await this.withdrawalService.findById(id);
+    if (withdrawal.userId !== request.user.userId) {
+      throw new NotFoundException(`Withdrawal ${id} not found`);
+    }
+    return withdrawal;
   }
 }
 
-// ─── Admin endpoints (separate controller prefix) ─────────────────────────────
-
 @ApiTags('Admin – Withdrawals')
 @ApiBearerAuth()
+@UseGuards(AdminRoleGuard)
 @Controller('admin/withdrawal')
 export class WithdrawalAdminController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
@@ -107,13 +108,46 @@ export class WithdrawalAdminController {
 
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
-  approve(@Param('id') id: string, @Body() dto: ApproveWithdrawalDto) {
-    return this.withdrawalService.approve(id, dto.adminId);
+  approve(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.withdrawalService.approve(id, request.user.userId);
+  }
+
+
+  @Post(':id/mark-paid')
+  @HttpCode(HttpStatus.OK)
+  markPaid(
+    @Param('id') id: string,
+    @Body() dto: MarkWithdrawalPaidDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.markManuallyPaid(
+      id,
+      request.user.userId,
+      dto.payoutReference,
+    );
+  }
+
+  @Post(':id/fail-payout')
+  @HttpCode(HttpStatus.OK)
+  failPayout(
+    @Param('id') id: string,
+    @Body() dto: FailWithdrawalDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.failManualPayout(
+      id,
+      request.user.userId,
+      dto.reason,
+    );
   }
 
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
-  reject(@Param('id') id: string, @Body() dto: RejectWithdrawalDto) {
-    return this.withdrawalService.reject(id, dto.adminId, dto.reason);
+  reject(
+    @Param('id') id: string,
+    @Body() dto: RejectWithdrawalDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.reject(id, request.user.userId, dto.reason);
   }
 }

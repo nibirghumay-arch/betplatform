@@ -57,10 +57,6 @@ export class InitiateDepositDto {
   @IsNotEmpty()
   pspProvider: string;
 
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
@@ -97,10 +93,6 @@ export class RequestWithdrawalDto {
   @IsNotEmpty()
   pspProvider: string;
 
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
-
   @IsOptional()
   @IsObject()
   payoutDetails?: Record<string, unknown>;
@@ -132,11 +124,20 @@ export class RejectWithdrawalDto {
   reason: string;
 }
 
-export class CancelWithdrawalDto {
+
+export class MarkWithdrawalPaidDto {
   @IsString()
   @IsNotEmpty()
-  userId: string;
+  payoutReference: string;
 }
+
+export class FailWithdrawalDto {
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+}
+
+export class CancelWithdrawalDto {}
 
 export class PaginationQueryDto {
   @IsOptional()

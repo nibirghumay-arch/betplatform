@@ -9,8 +9,8 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn(),
 }));
 
-const bcryptCompare = bcrypt.compare as jest.MockedFunction<typeof bcrypt.compare>;
-const bcryptHash = bcrypt.hash as jest.MockedFunction<typeof bcrypt.hash>;
+const bcryptCompare = bcrypt.compare as unknown as jest.Mock;
+const bcryptHash = bcrypt.hash as unknown as jest.Mock;
 
 function makeUser(id: string, email: string, passwordHash: string) {
   const now = new Date('2026-01-01T00:00:00.000Z');
