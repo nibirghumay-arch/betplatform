@@ -128,7 +128,7 @@ function ChangePasswordCard() {
 // ─── VIP level ─────────────────────────────────────────────────────────────
 
 const TIER_NAMES = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
-const TIER_THRESHOLDS = [0, 1000, 5000, 20000, 100000]; // wagered USD
+const TIER_THRESHOLDS = [0, 1000, 5000, 20000, 100000]; // wagered BDT
 const TIER_COLORS = [
   'from-amber-700 to-amber-600',
   'from-gray-400 to-gray-300',
@@ -173,7 +173,7 @@ function VipCard() {
             />
           </div>
           <p className="text-xs text-gray-500 text-right">
-            ${totalWager.toLocaleString()} / ${nextThreshold.toLocaleString()} wagered
+            ৳ {totalWager.toLocaleString()} / ৳ {nextThreshold.toLocaleString()} wagered
           </p>
         </div>
       ) : (
@@ -183,11 +183,11 @@ function VipCard() {
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-lg bg-white/5 p-3">
           <p className="text-xs text-gray-500">Total Wagered</p>
-          <p className="text-sm font-bold text-white">${parseFloat(vip?.totalWager ?? '0').toLocaleString()}</p>
+          <p className="text-sm font-bold text-white">৳ {parseFloat(vip?.totalWager ?? '0').toLocaleString()}</p>
         </div>
         <div className="rounded-lg bg-white/5 p-3">
           <p className="text-xs text-gray-500">Period Wagered</p>
-          <p className="text-sm font-bold text-white">${parseFloat(vip?.periodWager ?? '0').toLocaleString()}</p>
+          <p className="text-sm font-bold text-white">৳ {parseFloat(vip?.periodWager ?? '0').toLocaleString()}</p>
         </div>
       </div>
     </Card>
@@ -219,7 +219,7 @@ function BonusesCard() {
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <span className="text-xs font-semibold text-white">{b.bonusType}</span>
-                    <span className="ml-2 text-sm font-bold text-amber-400">${parseFloat(b.amount).toFixed(2)}</span>
+                    <span className="ml-2 text-sm font-bold text-amber-400">৳ {parseFloat(b.amount).toFixed(2)}</span>
                   </div>
                   <Badge label={b.status} />
                 </div>
@@ -227,7 +227,7 @@ function BonusesCard() {
                   <div className="h-1.5 rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Wagering: ${done.toFixed(2)} / ${total.toFixed(2)}
+                  Wagering: ৳ {done.toFixed(2)} / ৳ {total.toFixed(2)}
                 </p>
               </div>
             );
@@ -246,7 +246,7 @@ function BonusesCard() {
               <div key={b.id} className="flex items-center justify-between text-sm">
                 <div>
                   <span className="text-white">{b.bonusType}</span>
-                  <span className="ml-2 text-gray-400">${parseFloat(b.amount).toFixed(2)}</span>
+                  <span className="ml-2 text-gray-400">৳ {parseFloat(b.amount).toFixed(2)}</span>
                 </div>
                 <Badge label={b.status} />
               </div>
