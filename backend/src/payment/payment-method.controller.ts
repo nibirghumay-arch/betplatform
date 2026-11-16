@@ -6,19 +6,17 @@ import {
   Delete,
   Param,
   Body,
-  Query,
+  Req,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { IsString, IsNotEmpty } from 'class-validator';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { PaymentMethodService } from './payment-method.service';
 import { CreatePaymentMethodDto, UpdatePaymentMethodDto } from './dto/payment-method.dto';
 
-class UserScopedQueryDto {
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
+interface RequestWithUser extends Request {
+  user: { userId: string; role: string };
 }
 
 @ApiTags('Payment – Saved Methods')
@@ -28,34 +26,34 @@ export class PaymentMethodController {
   constructor(private readonly paymentMethodService: PaymentMethodService) {}
 
   @Get()
-  list(@Query() query: UserScopedQueryDto) {
-    return this.paymentMethodService.listByUser(query.userId);
+  list(@Req() request: RequestWithUser) {
+    return this.paymentMethodService.listByUser(request.user.userId);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Query() query: UserScopedQueryDto, @Body() dto: CreatePaymentMethodDto) {
-    return this.paymentMethodService.create(query.userId, dto);
+  create(@Body() dto: CreatePaymentMethodDto, @Req() request: RequestWithUser) {
+    return this.paymentMethodService.create(request.user.userId, dto);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Query() query: UserScopedQueryDto,
     @Body() dto: UpdatePaymentMethodDto,
+    @Req() request: RequestWithUser,
   ) {
-    return this.paymentMethodService.update(id, query.userId, dto);
+    return this.paymentMethodService.update(id, request.user.userId, dto);
   }
 
   @Patch(':id/default')
   @HttpCode(HttpStatus.OK)
-  setDefault(@Param('id') id: string, @Query() query: UserScopedQueryDto) {
-    return this.paymentMethodService.setDefault(id, query.userId);
+  setDefault(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.paymentMethodService.setDefault(id, request.user.userId);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string, @Query() query: UserScopedQueryDto) {
-    return this.paymentMethodService.remove(id, query.userId);
+  remove(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.paymentMethodService.remove(id, request.user.userId);
   }
 }
