@@ -29,7 +29,23 @@ type DepositRow = {
   paymentChannel?: string | null;
   createdAt: string;
   user: { id: string; email: string; username: string };
-  metadata?: { bdGateway?: { receivingNumber?: string; provider?: string } } | null;
+  failureReason?: string | null;
+  metadata?: {
+    bdGateway?: {
+      receivingNumber?: string;
+      provider?: string;
+      customerTrxId?: string;
+      customerMsisdn?: string | null;
+      adminSmsTrxId?: string;
+      lastTrxCheck?: {
+        matches?: boolean;
+        customerTrxId?: string;
+        adminSmsTrxId?: string;
+        checkedAt?: string;
+      } | null;
+      gatewayReportedStatus?: string;
+    };
+  } | null;
 };
 
 type GatewaySettings = {
@@ -70,6 +86,7 @@ export default function PaymentsPage() {
   const [withdrawalPage, setWithdrawalPage] = useState(0);
   const [depositStatus, setDepositStatus] = useState('PENDING_PAYMENT');
   const [depositPage, setDepositPage] = useState(0);
+  const [smsTrxInputs, setSmsTrxInputs] = useState<Record<string, string>>({});
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [payoutTarget, setPayoutTarget] = useState<string | null>(null);
@@ -149,6 +166,39 @@ export default function PaymentsPage() {
 
   const reconcileDeposit = useMutation({
     mutationFn: (id: string) => api.post(`/admin/payment/deposits/${id}/reconcile`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+    },
+  });
+
+  const checkDepositTrx = useMutation({
+    mutationFn: ({ id, smsTrxId }: { id: string; smsTrxId: string }) =>
+      api.post(`/admin/payment/deposits/${id}/check-trx`, { smsTrxId }).then((r) => r.data as {
+        matches: boolean;
+        message: string;
+      }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+      setSmsTrxInputs((current) => ({ ...current, [variables.id]: variables.smsTrxId }));
+    },
+  });
+
+  const approveDeposit = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`/admin/payment/deposits/${id}/approve`).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'deposits'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+    },
+  });
+
+  const rejectDeposit = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`/admin/payment/deposits/${id}/reject`, {
+        reason: 'Rejected by administrator',
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'deposits'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
@@ -280,49 +330,142 @@ export default function PaymentsPage() {
             <p className="py-10 text-center text-sm text-gray-500">No deposit requests found.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
+              <table className="w-full min-w-[1380px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-xs text-gray-500">
                     <th className="pb-3 pr-4">Customer</th>
                     <th className="pb-3 pr-4">Amount</th>
                     <th className="pb-3 pr-4">Method</th>
+                    <th className="pb-3 pr-4">Customer TrxID</th>
+                    <th className="pb-3 pr-4">SMS TrxID check</th>
                     <th className="pb-3 pr-4">Status</th>
                     <th className="pb-3 pr-4">Date</th>
-                    <th className="pb-3">Gateway check</th>
+                    <th className="pb-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(depositsQuery.data ?? []).map((deposit) => (
-                    <tr key={deposit.id} className="border-b border-white/5">
-                      <td className="py-3 pr-4">
-                        <p className="font-medium text-white">{deposit.user?.username ?? 'Unknown user'}</p>
-                        <p className="text-xs text-gray-500">{deposit.user?.email}</p>
-                        <p className="mt-1 font-mono text-[10px] text-gray-600">{deposit.id.slice(0, 12)}…</p>
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-amber-400">
-                        ৳ {Number(deposit.amount).toFixed(2)}
-                      </td>
-                      <td className="py-3 pr-4 text-gray-300">{deposit.paymentChannel || deposit.pspProvider}</td>
-                      <td className="py-3 pr-4"><Badge label={deposit.status} /></td>
-                      <td className="py-3 pr-4 whitespace-nowrap text-xs text-gray-500">{new Date(deposit.createdAt).toLocaleString()}</td>
-                      <td className="py-3">
-                        {deposit.pspProvider === 'bdgateway' && !['COMPLETED', 'FAILED', 'CANCELLED'].includes(deposit.status) ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            loading={reconcileDeposit.isPending}
-                            onClick={() => reconcileDeposit.mutate(deposit.id)}
-                          >
-                            Check status
-                          </Button>
-                        ) : <span className="text-xs text-gray-600">—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {(depositsQuery.data ?? []).map((deposit) => {
+                    const bd = deposit.metadata?.bdGateway;
+                    const customerTrxId = bd?.customerTrxId ?? '';
+                    const smsTrxId = smsTrxInputs[deposit.id] ?? bd?.adminSmsTrxId ?? '';
+                    const lastCheck = bd?.lastTrxCheck;
+                    const isPending = deposit.status === 'PENDING_PAYMENT';
+                    const checkIsCurrentMatch = Boolean(
+                      customerTrxId &&
+                      lastCheck?.matches === true &&
+                      lastCheck.customerTrxId?.trim().toUpperCase() === customerTrxId.trim().toUpperCase() &&
+                      lastCheck.adminSmsTrxId?.trim().toUpperCase() === smsTrxId.trim().toUpperCase() &&
+                      bd?.adminSmsTrxId?.trim().toUpperCase() === smsTrxId.trim().toUpperCase(),
+                    );
+
+                    return (
+                      <tr key={deposit.id} className="border-b border-white/5 align-top">
+                        <td className="py-3 pr-4">
+                          <p className="font-medium text-white">{deposit.user?.username ?? 'Unknown user'}</p>
+                          <p className="text-xs text-gray-500">{deposit.user?.email}</p>
+                          <p className="mt-1 font-mono text-[10px] text-gray-600">{deposit.id.slice(0, 12)}…</p>
+                        </td>
+                        <td className="py-3 pr-4 whitespace-nowrap font-mono text-amber-400">
+                          ৳ {Number(deposit.amount).toFixed(2)}
+                        </td>
+                        <td className="py-3 pr-4 text-gray-300">{deposit.paymentChannel || deposit.pspProvider}</td>
+                        <td className="py-3 pr-4">
+                          {deposit.pspProvider === 'bdgateway' ? (
+                            <>
+                              <p className="font-mono text-sm text-white">{customerTrxId || 'Not submitted yet'}</p>
+                              {bd?.customerMsisdn && (
+                                <p className="mt-1 text-xs text-gray-500">Sender: {bd.customerMsisdn}</p>
+                              )}
+                            </>
+                          ) : <span className="text-xs text-gray-600">Not required</span>}
+                        </td>
+                        <td className="py-3 pr-4">
+                          {deposit.pspProvider === 'bdgateway' && isPending ? (
+                            <div className="min-w-[250px] space-y-2">
+                              <input
+                                value={smsTrxId}
+                                onChange={(event) => setSmsTrxInputs((current) => ({
+                                  ...current,
+                                  [deposit.id]: event.target.value,
+                                }))}
+                                placeholder="Paste TrxID from mobile SMS"
+                                maxLength={20}
+                                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white placeholder-gray-500"
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  loading={checkDepositTrx.isPending && checkDepositTrx.variables?.id === deposit.id}
+                                  disabled={!customerTrxId || smsTrxId.trim().length < 6 || checkDepositTrx.isPending}
+                                  onClick={() => checkDepositTrx.mutate({ id: deposit.id, smsTrxId: smsTrxId.trim() })}
+                                >
+                                  Check TrxID
+                                </Button>
+                                {lastCheck && (
+                                  <span className={lastCheck.matches ? 'text-xs text-green-400' : 'text-xs text-red-400'}>
+                                    {lastCheck.matches ? 'Matched' : 'Mismatch'}
+                                  </span>
+                                )}
+                              </div>
+                              {lastCheck && (
+                                <p className="text-[11px] text-gray-500">
+                                  Last checked: {new Date(lastCheck.checkedAt ?? '').toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          ) : deposit.pspProvider === 'bdgateway' ? (
+                            <span className="text-xs text-gray-500">{bd?.adminSmsTrxId ? 'SMS TrxID checked' : 'No check recorded'}</span>
+                          ) : <span className="text-xs text-gray-600">—</span>}
+                        </td>
+                        <td className="py-3 pr-4"><Badge label={deposit.status} /></td>
+                        <td className="py-3 pr-4 whitespace-nowrap text-xs text-gray-500">{new Date(deposit.createdAt).toLocaleString()}</td>
+                        <td className="py-3">
+                          {deposit.pspProvider === 'bdgateway' && isPending ? (
+                            <div className="flex min-w-[160px] flex-col gap-2">
+                              <Button
+                                size="sm"
+                                loading={approveDeposit.isPending && approveDeposit.variables === deposit.id}
+                                disabled={!checkIsCurrentMatch || approveDeposit.isPending || rejectDeposit.isPending}
+                                onClick={() => approveDeposit.mutate(deposit.id)}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                loading={rejectDeposit.isPending && rejectDeposit.variables === deposit.id}
+                                disabled={approveDeposit.isPending || rejectDeposit.isPending}
+                                onClick={() => {
+                                  if (window.confirm('Reject this deposit request? The customer will not receive wallet credit.')) {
+                                    rejectDeposit.mutate(deposit.id);
+                                  }
+                                }}
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                loading={reconcileDeposit.isPending && reconcileDeposit.variables === deposit.id}
+                                disabled={reconcileDeposit.isPending}
+                                onClick={() => reconcileDeposit.mutate(deposit.id)}
+                              >
+                                Refresh gateway
+                              </Button>
+                            </div>
+                          ) : <span className="text-xs text-gray-600">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
+          {checkDepositTrx.isError && <p className="mt-3 text-sm text-red-400">{apiError(checkDepositTrx.error)}</p>}
+          {approveDeposit.isError && <p className="mt-3 text-sm text-red-400">{apiError(approveDeposit.error)}</p>}
+          {rejectDeposit.isError && <p className="mt-3 text-sm text-red-400">{apiError(rejectDeposit.error)}</p>}
           {reconcileDeposit.isError && <p className="mt-3 text-sm text-red-400">{apiError(reconcileDeposit.error)}</p>}
           <div className="mt-5 flex items-center justify-between text-xs text-gray-500">
             <span>Page {depositPage + 1} · refreshes every 15 seconds</span>
