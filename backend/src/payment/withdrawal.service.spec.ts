@@ -257,16 +257,22 @@ describe('WithdrawalService', () => {
       const w = makeWithdrawal('w-1', WithdrawalStatus.PENDING_REVIEW);
       prisma.withdrawal.findUnique.mockResolvedValue(w);
       prisma.withdrawal.update.mockResolvedValue({});
+      const transactionService = makeTransactionService();
 
-      const svc = makeService({ prisma });
+      const svc = makeService({ prisma, transactionService });
       await svc.approve('w-1', 'admin-1');
 
+      expect(transactionService.withdraw).toHaveBeenCalledWith(expect.objectContaining({
+        reference: 'withdrawal:w-1',
+        initiatedBy: 'admin-1',
+      }));
       expect(prisma.withdrawal.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             status: WithdrawalStatus.PROCESSING,
             reviewedBy: 'admin-1',
             pspPayoutId: expect.stringContaining('payout_'),
+            transactionId: 'tx-w-1',
           }),
         }),
       );
@@ -572,6 +578,7 @@ describe('WithdrawalService', () => {
       (w as any).pspPayoutId = 'payout_3';
       const prisma = makePrisma();
       prisma.withdrawal.findFirst.mockResolvedValue(w);
+      prisma.withdrawal.findUnique.mockResolvedValue(w);
       prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 });
       const transactionService = makeTransactionService({
         withdraw: jest.fn().mockRejectedValue(new BadRequestException('Insufficient funds')),
