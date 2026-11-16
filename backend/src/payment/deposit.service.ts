@@ -519,12 +519,15 @@ export class DepositService {
   }
 
   async listByUser(userId: string, skip = 0, take = 50) {
-    return this.prisma.deposit.findMany({
+    const deposits = await this.prisma.deposit.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       skip,
       take,
     });
+    // The gateway order reference is a backend-only identifier. Customers
+    // need the public payment instructions, not the merchant-side reference.
+    return deposits.map(({ pspSessionId: _gatewayOrderReference, ...deposit }) => deposit);
   }
 
   // ─── Private: event routing ─────────────────────────────────────────────────
