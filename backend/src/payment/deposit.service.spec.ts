@@ -33,7 +33,7 @@ function makePrisma(overrides: Record<string, any> = {}) {
 
 function makeWalletService(overrides: Record<string, any> = {}) {
   return {
-    getWalletByUserId: jest.fn().mockResolvedValue({ id: 'wallet-1', currency: 'USD', isActive: true, isFrozen: false }),
+    getWalletByUserId: jest.fn().mockResolvedValue({ id: 'wallet-1', currency: 'BDT', isActive: true, isFrozen: false }),
     assertWalletActive: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as any;
