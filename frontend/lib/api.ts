@@ -36,7 +36,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const requestUrl = err.config?.url ?? '';
-    const isPublicAuthRequest = /\\/auth\\/(login|register|refresh|logout)(?:\\?|$)/.test(requestUrl);
+    const isPublicAuthRequest = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].some((path) => requestUrl.startsWith(path));
 
     // Invalid credentials are an expected login response. Do not reload the
     // login page before its form can show the backend's useful error message.
