@@ -10,6 +10,7 @@ import { SslcommerzModule } from './sslcommerz/sslcommerz.module';
 import { BdGatewayModule } from './bdgateway/bdgateway.module';
 import { BdGatewayController } from './bdgateway/bdgateway.controller';
 import { BdGatewayAdminController, BdGatewayOptionsController } from './bdgateway/bdgateway-config.controller';
+import { BdGatewayAdminDepositsController } from './bdgateway/bdgateway-admin-deposits.controller';
 import { TransactionModule } from '../transaction/transaction.module';
 import { WalletModule } from '../wallet/wallet.module';
 
@@ -21,6 +22,7 @@ import { WalletModule } from '../wallet/wallet.module';
     BdGatewayController,
     BdGatewayAdminController,
     BdGatewayOptionsController,
+    BdGatewayAdminDepositsController,
     WithdrawalController,
     WithdrawalAdminController,
     PaymentMethodController,
