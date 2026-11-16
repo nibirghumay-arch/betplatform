@@ -540,12 +540,13 @@ export class WithdrawalService {
       where: { id: withdrawalId },
     });
 
-    if (!withdrawal || [
-      WithdrawalStatus.COMPLETED,
-      WithdrawalStatus.FAILED,
-      WithdrawalStatus.CANCELLED,
-      WithdrawalStatus.REJECTED,
-    ].includes(withdrawal.status)) {
+    if (
+      !withdrawal ||
+      withdrawal.status === WithdrawalStatus.COMPLETED ||
+      withdrawal.status === WithdrawalStatus.FAILED ||
+      withdrawal.status === WithdrawalStatus.CANCELLED ||
+      withdrawal.status === WithdrawalStatus.REJECTED
+    ) {
       return;
     }
 
