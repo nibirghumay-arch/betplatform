@@ -9,12 +9,16 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WithdrawalStatus } from '@prisma/client';
 import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { WithdrawalService } from './withdrawal.service';
 import {
   RequestWithdrawalDto,
@@ -26,15 +30,17 @@ import {
 
 @ApiTags('Payment – Withdrawals')
 @ApiBearerAuth()
+interface RequestWithUser extends Request { user: { userId: string; role: string } };
+
 @Controller('payment/withdrawal')
 export class WithdrawalController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  request(@Body() dto: RequestWithdrawalDto) {
+  request(@Body() dto: RequestWithdrawalDto, @Req() request: RequestWithUser) {
     return this.withdrawalService.request({
-      userId: dto.userId,
+      userId: request.user.userId,
       amount: dto.amount,
       currency: dto.currency,
       pspProvider: dto.pspProvider,
@@ -46,8 +52,8 @@ export class WithdrawalController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  cancel(@Param('id') id: string, @Body() dto: CancelWithdrawalDto) {
-    return this.withdrawalService.cancel(id, dto.userId);
+  cancel(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.withdrawalService.cancel(id, request.user.userId);
   }
 
   /**
@@ -72,16 +78,17 @@ export class WithdrawalController {
   }
 
   @Get()
-  list(
-    @Query('userId') userId: string,
-    @Query() pagination: PaginationQueryDto,
-  ) {
-    return this.withdrawalService.listByUser(userId, pagination.skip, pagination.take);
+  list(@Query() pagination: PaginationQueryDto, @Req() request: RequestWithUser) {
+    return this.withdrawalService.listByUser(request.user.userId, pagination.skip, pagination.take);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.withdrawalService.findById(id);
+  async findOne(@Param('id') id: string, @Req() request: RequestWithUser) {
+    const withdrawal = await this.withdrawalService.findById(id);
+    if (withdrawal.userId !== request.user.userId) {
+      throw new NotFoundException(`Withdrawal ${id} not found`);
+    }
+    return withdrawal;
   }
 }
 
@@ -90,6 +97,7 @@ export class WithdrawalController {
 @ApiTags('Admin – Withdrawals')
 @ApiBearerAuth()
 @Controller('admin/withdrawal')
+@UseGuards(AdminRoleGuard)
 export class WithdrawalAdminController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 
@@ -107,13 +115,17 @@ export class WithdrawalAdminController {
 
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
-  approve(@Param('id') id: string, @Body() dto: ApproveWithdrawalDto) {
-    return this.withdrawalService.approve(id, dto.adminId);
+  approve(@Param('id') id: string, @Req() request: RequestWithUser) {
+    return this.withdrawalService.approve(id, request.user.userId);
   }
 
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
-  reject(@Param('id') id: string, @Body() dto: RejectWithdrawalDto) {
-    return this.withdrawalService.reject(id, dto.adminId, dto.reason);
+  reject(
+    @Param('id') id: string,
+    @Body() dto: RejectWithdrawalDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return this.withdrawalService.reject(id, request.user.userId, dto.reason);
   }
 }
