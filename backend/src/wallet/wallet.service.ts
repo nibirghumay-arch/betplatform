@@ -39,7 +39,7 @@ export class WalletService {
 
   // ─── User Wallet Lifecycle ──────────────────────────────────────────────────
 
-  async createWallet(userId: string, currency = 'USD'): Promise<WalletSummary> {
+  async createWallet(userId: string, currency = 'BDT'): Promise<WalletSummary> {
     const existing = await this.prisma.wallet.findUnique({
       where: { userId },
       select: { id: true },
