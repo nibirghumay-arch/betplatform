@@ -85,11 +85,27 @@ export class DepositService {
     const amount = this.parseAmount(params.amount);
     const currency = params.currency ?? 'USD';
 
-    const wallet = await this.walletService.getWalletByUserId(params.userId);
+    let wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);
+
+    // Migrate only truly unused legacy USD wallets. A wallet with ledger
+    // history must never be relabelled because that would rewrite the meaning
+    // of previous balances and transactions.
+    if (currency === 'BDT' && wallet.currency === 'USD') {
+      const priorEntries = await this.prisma.ledgerEntry.count({ where: { walletId: wallet.id } });
+      if (priorEntries === 0) {
+        wallet = await this.prisma.wallet.update({
+          where: { id: wallet.id },
+          data: { currency: 'BDT' },
+          select: {
+            id: true, userId: true, currency: true, walletType: true, isActive: true, isFrozen: true,
+          },
+        });
+      }
+    }
     if (wallet.currency !== currency) {
       throw new BadRequestException(
-        `Your wallet is denominated in ${wallet.currency}; this deposit is denominated in ${currency}. Contact support before attempting a currency change.`,
+        `Your wallet is denominated in ${wallet.currency}; this deposit is denominated in ${currency}. This account has previous ledger activity and needs an administrator-approved currency migration before BDT deposits can be accepted.`,
       );
     }
 
