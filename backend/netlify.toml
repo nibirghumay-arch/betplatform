@@ -27,14 +27,16 @@
 # ============================================================
 
 [build]
-  command = "if [ \"$CONTEXT\" = \"production\" ]; then if [ -n \"$DIRECT_DATABASE_URL\" ]; then export DATABASE_URL=\"$DIRECT_DATABASE_URL\"; fi; npm run prisma:migrate:deploy; fi && npm run build:netlify"
+  command = "npm run prisma:generate && if [ \"$CONTEXT\" = \"production\" ]; then if [ -n \"$DIRECT_DATABASE_URL\" ]; then export DATABASE_URL=\"$DIRECT_DATABASE_URL\"; fi; npm run prisma:migrate:deploy; fi && npm run build:netlify"
   publish = "public"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Prisma downloads the engine matching this target at generate time.
-  PRISMA_CLI_BINARY_TARGETS = "rhel-openssl-3.0.x"
+  # The Prisma CLI runs in Netlify's Debian build image. The deployed
+  # Netlify Function runs on AWS Lambda (RHEL). Both CLI and client targets
+  # must be present: Debian's schema-engine is used by migrate deploy.
+  PRISMA_CLI_BINARY_TARGETS = "debian-openssl-3.0.x,rhel-openssl-3.0.x"
 
 [functions]
   node_bundler = "esbuild"
