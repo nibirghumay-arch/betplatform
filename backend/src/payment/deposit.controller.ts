@@ -161,6 +161,7 @@ export class DepositController {
     if (deposit.userId !== request.user.userId) {
       throw new NotFoundException(`Deposit ${id} not found`);
     }
-    return deposit;
+    const { pspSessionId: _gatewayOrderReference, ...safeDeposit } = deposit;
+    return safeDeposit;
   }
 }
