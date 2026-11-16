@@ -29,7 +29,7 @@ function buildLedgerMock() {
 const WALLET_STUB = {
   id: 'wallet-abc',
   userId: 'user-1',
-  currency: 'USD',
+  currency: 'BDT',
   walletType: WalletType.USER,
   isActive: true,
   isFrozen: false,
@@ -79,7 +79,7 @@ describe('WalletService', () => {
       await expect(service.createWallet('user-1')).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('defaults currency to USD', async () => {
+    it('defaults currency to BDT', async () => {
       (prisma.wallet.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.wallet.create as jest.Mock).mockResolvedValue({ ...WALLET_STUB, currency: 'USD' });
 
