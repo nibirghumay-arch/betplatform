@@ -2,5 +2,8 @@
   command = "npm run build"
   publish = ".next"
 
+[build.environment]
+  NEXT_PUBLIC_API_URL = "https://betplatform-api.netlify.app/api/v1"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
