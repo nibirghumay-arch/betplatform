@@ -175,7 +175,7 @@ model LedgerEntry {
   transactionId String      @map("transaction_id")
   entryType     EntryType   @map("entry_type")
   amount        Decimal     @db.Decimal(18, 8)
-  currency      String      @default("USD")
+  currency      String      @default("BDT")
   description   String?
   createdAt     DateTime    @default(now()) @map("created_at")
   wallet        Wallet      @relation(fields: [walletId], references: [id])
@@ -191,7 +191,7 @@ model Transaction {
   type          TransactionType
   status        TransactionStatus @default(PENDING)
   amount        Decimal           @db.Decimal(18, 8)
-  currency      String            @default("USD")
+  currency      String            @default("BDT")
   // Idempotency key — unique per external payment/event reference.
   reference     String?           @unique
   description   String?
@@ -293,7 +293,7 @@ model GameSession {
   // Opaque token passed to the iframe and used in every postMessage event.
   token      String            @unique
   status     GameSessionStatus @default(ACTIVE)
-  currency   String            @default("USD")
+  currency   String            @default("BDT")
   launchUrl  String?           @map("launch_url")
   expiresAt  DateTime          @map("expires_at")
   startedAt  DateTime          @default(now()) @map("started_at")
@@ -313,7 +313,7 @@ model Deposit {
   id            String        @id @default(cuid())
   userId        String        @map("user_id")
   amount        Decimal       @db.Decimal(18, 8)
-  currency      String        @default("USD")
+  currency      String        @default("BDT")
   status        DepositStatus @default(PENDING_PAYMENT)
   pspProvider   String        @map("psp_provider")
   // PSP checkout session ID returned when initiating payment.
@@ -345,7 +345,7 @@ model Withdrawal {
   id              String           @id @default(cuid())
   userId          String           @map("user_id")
   amount          Decimal          @db.Decimal(18, 8)
-  currency        String           @default("USD")
+  currency        String           @default("BDT")
   status          WithdrawalStatus @default(PENDING_KYC)
   pspProvider     String           @map("psp_provider")
   // PSP payout ID assigned when we initiate the payout (on admin approval).
@@ -439,7 +439,7 @@ model ReferralReward {
   referralId    String               @map("referral_id")
   userId        String               @map("user_id")
   amount        Decimal              @db.Decimal(18, 8)
-  currency      String               @default("USD")
+  currency      String               @default("BDT")
   status        ReferralRewardStatus @default(PENDING)
   rewardType    String               @map("reward_type")
   transactionId String?              @unique @map("transaction_id")
@@ -512,7 +512,7 @@ model Bonus {
   bonusType           BonusType   @map("bonus_type")
   status              BonusStatus @default(PENDING_CLAIM)
   amount              Decimal     @db.Decimal(18, 8)
-  currency            String      @default("USD")
+  currency            String      @default("BDT")
   wageringRequirement Decimal     @db.Decimal(18, 8) @map("wagering_requirement")
   wageredAmount       Decimal     @db.Decimal(18, 8) @default(0) @map("wagered_amount")
   transactionId       String?     @unique @map("transaction_id")
