@@ -20,13 +20,13 @@
 #   BD_GATEWAY_WEBHOOK_SECRET   from the gateway's admin → Merchants screen
 #   SSLCOMMERZ_STORE_ID / SSLCOMMERZ_STORE_PASSWORD / SSLCOMMERZ_LIVE (optional)
 #
-# Database migrations are NOT run by the build. Apply them once per schema
-# change from your machine, against the DIRECT (non-pooled) URL:
-#   DATABASE_URL="postgresql://...direct..." npx prisma migrate deploy
+# Database migrations run automatically before the backend is built.
+# Set DIRECT_DATABASE_URL to the provider's direct (non-pooled) PostgreSQL URL.
+# If it is not set, the build falls back to DATABASE_URL.
 # ============================================================
 
 [build]
-  command = "npm run build:netlify"
+  command = "if [ -n \"$DIRECT_DATABASE_URL\" ]; then export DATABASE_URL=\"$DIRECT_DATABASE_URL\"; fi && npm run prisma:migrate:deploy && npm run build:netlify"
   publish = "public"
   functions = "netlify/functions"
 
