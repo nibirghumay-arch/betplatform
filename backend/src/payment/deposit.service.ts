@@ -518,7 +518,7 @@ export class DepositService {
   private async handleSuccess(data: Record<string, unknown>): Promise<void> {
     const pspReference = (data['pspReference'] ?? data['id'] ?? data['payment_intent']) as string | undefined;
     const rawAmount = data['amount'] ?? data['amount_received'];
-    const currency = ((data['currency'] as string | undefined) ?? 'USD').toUpperCase();
+    const currency = ((data['currency'] as string | undefined) ?? 'BDT').toUpperCase();
 
     if (!pspReference) {
       this.logger.error(`Deposit success webhook missing pspReference: ${JSON.stringify(data)}`);
