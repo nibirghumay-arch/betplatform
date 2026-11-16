@@ -8,7 +8,7 @@ import { AdminSidebar } from '@/components/admin/admin-sidebar';
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 
 const Checking = () => (
-  <div className="flex h-screen items-center justify-center bg-[#0a0a0f]">
+  <div className="flex h-screen items-center justify-center bg-[#0c1122]">
     <p className="text-sm text-gray-600">Checking access…</p>
   </div>
 );
@@ -38,7 +38,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile top bar — hamburger + title */}
-        <div className="flex items-center border-b border-white/5 bg-[#0d0d14] px-4 py-3 md:hidden">
+        <div className="flex items-center border-b border-white/10 bg-[#111a31]/90 backdrop-blur-xl px-4 py-3 md:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
