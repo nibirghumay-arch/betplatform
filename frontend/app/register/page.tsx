@@ -49,11 +49,11 @@ export default function RegisterPage() {
 
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-amber-400">BetPlatform</h1>
-          <p className="mt-1 text-sm text-gray-400">Create your account</p>
+          <h1 className="bg-gradient-to-r from-amber-200 via-white to-cyan-200 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent drop-shadow-lg">BetPlatform</h1>
+          <p className="mt-1 text-sm text-slate-300">Create your account</p>
         </div>
         <Card>
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -90,7 +90,7 @@ export default function RegisterPage() {
           </form>
           <p className="mt-4 text-center text-sm text-gray-400">
             Already have an account?{' '}
-            <Link href="/login" className="text-amber-400 hover:underline">
+            <Link href="/login" className="text-cyan-200 hover:text-white hover:underline">
               Sign in
             </Link>
           </p>
