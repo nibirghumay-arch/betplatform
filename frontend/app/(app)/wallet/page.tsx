@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,6 +26,14 @@ const MOBILE_WALLETS: PaymentMethodType[] = ['BKASH', 'NAGAD', 'ROCKET', 'UPAY',
 // The self-hosted gateway only covers wallets the operator holds a SIM for.
 const BD_GATEWAY_WALLETS: PaymentMethodType[] = ['BKASH', 'NAGAD', 'ROCKET', 'UPAY'];
 
+interface BdGatewayOptions {
+  enabled: boolean;
+  providers: PaymentMethodType[];
+  minDepositBdt: number;
+  maxDepositBdt: number;
+  currency: 'BDT';
+}
+
 const depositSchema = z
   .object({
     amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount').refine((v) => parseFloat(v) >= 10, 'Minimum ৳10'),
@@ -41,7 +51,12 @@ type DepositForm = z.infer<typeof depositSchema>;
 function DepositCard() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
+  const { data: bdGatewayOptions } = useQuery<BdGatewayOptions>({
+    queryKey: ['bd-gateway-options'],
+    queryFn: () => api.get('/payment/bdgateway/options').then((r) => r.data),
+  });
   const [serverError, setServerError] = useState('');
 
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm<DepositForm>({
@@ -68,10 +83,14 @@ function DepositCard() {
           },
         }),
       });
+      if (res.data.paymentDetails?.depositId || res.data.depositId && res.data.paymentDetails) {
+        reset();
+        router.push(`/wallet/deposit/pay/${res.data.depositId}`);
+        return;
+      }
       if (res.data.checkoutUrl) {
-        // SSLCommerz (and other real PSPs) return their own hosted checkout
-        // page — send the browser there directly, since SSLCommerz redirects
-        // back to our own success/fail/cancel URLs once payment resolves.
+        // Third-party PSPs (for example SSLCommerz) retain their hosted
+        // checkout. BD gateway Send Money is completed inside BetPlatform.
         setRedirecting(true);
         window.location.href = res.data.checkoutUrl;
       } else {
@@ -100,7 +119,9 @@ function DepositCard() {
               {...register('pspProvider')}
               className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
             >
-              <option value="bdgateway">bKash / Nagad / Rocket / Upay — Send Money</option>
+              <option value="bdgateway" disabled={!bdGatewayOptions?.enabled}>
+                {bdGatewayOptions?.enabled ? 'bKash / Nagad / Rocket / Upay — BetPlatform checkout' : 'BetPlatform BD gateway — not configured'}
+              </option>
               <option value="sslcommerz">Mobile Banking / Card (SSLCommerz)</option>
               <option value="stripe">Stripe</option>
               <option value="paypal">PayPal</option>
@@ -114,14 +135,18 @@ function DepositCard() {
                 {...register('bdProvider')}
                 className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
               >
-                {BD_GATEWAY_WALLETS.map((w) => (
+                {(bdGatewayOptions?.providers?.length
+                  ? bdGatewayOptions.providers
+                  : BD_GATEWAY_WALLETS).map((w) => (
                   <option key={w} value={w}>{PAYMENT_METHOD_LABELS[w]}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-500">
-                You&apos;ll see our receiving number on the next page. Send the exact amount, then
-                paste the TrxID from your confirmation SMS — the balance lands automatically once
-                it&apos;s verified.
+                Your payment instructions and TrxID form will open inside BetPlatform. You will not
+                need to visit the gateway operator&apos;s website.
+                {bdGatewayOptions?.enabled
+                  ? ` Deposit range: ৳${bdGatewayOptions.minDepositBdt.toLocaleString()}–৳${bdGatewayOptions.maxDepositBdt.toLocaleString()}.`
+                  : ' The site administrator has not enabled this payment method yet.'}
               </p>
             </div>
           )}
