@@ -83,7 +83,7 @@ export class DepositService {
 
   async initiate(params: InitiateDepositParams): Promise<InitiateDepositResult> {
     const amount = this.parseAmount(params.amount);
-    const currency = params.currency ?? 'USD';
+    const currency = params.currency ?? 'BDT';
 
     let wallet = await this.walletService.getWalletByUserId(params.userId);
     await this.walletService.assertWalletActive(wallet.id);

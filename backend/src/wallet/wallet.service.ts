@@ -144,7 +144,7 @@ export class WalletService {
    */
   async getOrCreateSystemWallet(
     type: 'SYSTEM' | 'HOUSE' | 'BONUS_POOL',
-    currency = 'USD',
+    currency = 'BDT',
   ): Promise<string> {
     const cacheKey = `${type}:${currency}`;
     const cached = this.systemWalletCache.get(cacheKey);
