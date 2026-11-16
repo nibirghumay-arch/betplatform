@@ -203,6 +203,9 @@ export class BdGatewayConfigService {
     if (!['https:', 'http:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
       throw new BadRequestException('Gateway URL must be an HTTP(S) URL without embedded credentials');
     }
+    if (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash) {
+      throw new BadRequestException('Enter only the gateway site origin, without a path, query or fragment');
+    }
     if (this.config.get<string>('NODE_ENV') === 'production' && parsedUrl.protocol !== 'https:') {
       throw new BadRequestException('HTTPS is required for the payment gateway in production');
     }
