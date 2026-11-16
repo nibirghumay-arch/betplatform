@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -203,7 +202,6 @@ const withdrawSchema = z.object({
 type WithdrawForm = z.infer<typeof withdrawSchema>;
 
 function WithdrawCard() {
-  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const { data: methods = [] } = usePaymentMethods();
   const [success, setSuccess] = useState(false);
