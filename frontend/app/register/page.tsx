@@ -7,22 +7,22 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api, apiError } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 
 const schema = z.object({
-  email: z.string().email('Invalid email'),
-  username: z.string().min(3, 'At least 3 characters').max(20),
+  email: z.string().trim().email('Enter a valid email address').transform((value) => value.toLowerCase()),
+  username: z.string().trim().toLowerCase().min(3, 'At least 3 characters').max(20, 'Maximum 20 characters'),
   password: z.string().min(8, 'At least 8 characters'),
-  referralCode: z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const [serverError, setServerError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -33,29 +33,20 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setServerError('');
     try {
-      await api.post('/auth/register', data);
-      setSuccess(true);
+      const response = await api.post('/auth/register', data);
+      const user = response.data.user;
+      setAuth({
+        ...user,
+        status: user.status ?? (user.isActive ? 'ACTIVE' : 'INACTIVE'),
+        emailVerified: user.emailVerified ?? Boolean(user.emailVerifiedAt),
+      }, response.data.accessToken);
+      router.replace('/lobby');
     } catch (err) {
       setServerError(apiError(err));
     }
   };
 
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <Card className="max-w-sm w-full text-center">
-          <div className="text-4xl mb-4">📧</div>
-          <h2 className="text-xl font-semibold mb-2">Check your email</h2>
-          <p className="text-sm text-gray-400 mb-6">
-            We sent a verification link to your email address. Click it to activate your account.
-          </p>
-          <Link href="/login">
-            <Button variant="secondary" className="w-full">Back to Login</Button>
-          </Link>
-        </Card>
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -69,12 +60,14 @@ export default function RegisterPage() {
             <Input
               label="Email"
               type="email"
+              autoComplete="email"
               placeholder="you@example.com"
               error={errors.email?.message}
               {...register('email')}
             />
             <Input
               label="Username"
+              autoComplete="username"
               placeholder="coolplayer99"
               error={errors.username?.message}
               {...register('username')}
@@ -82,15 +75,12 @@ export default function RegisterPage() {
             <Input
               label="Password"
               type="password"
+              autoComplete="new-password"
               placeholder="Min. 8 characters"
               error={errors.password?.message}
               {...register('password')}
             />
-            <Input
-              label="Referral Code (optional)"
-              placeholder="ABC123"
-              {...register('referralCode')}
-            />
+            <p className="-mt-2 text-xs text-gray-500">Your username must be unique. No email verification is required.</p>
             {serverError && (
               <p className="rounded-lg bg-red-900/30 px-3 py-2 text-sm text-red-400">{serverError}</p>
             )}

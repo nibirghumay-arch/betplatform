@@ -1,24 +1,24 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class RegisterDto {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
   @IsEmail()
   email!: string;
 
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
   @IsString()
   @MinLength(3)
-  @MaxLength(32)
+  @MaxLength(20)
   username!: string;
 
   @IsString()
   @MinLength(8)
   password!: string;
-
-  @IsOptional()
-  @IsString()
-  referralCode?: string;
 }
 
 export class LoginDto {
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value)
   @IsEmail()
   email!: string;
 
