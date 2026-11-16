@@ -84,7 +84,7 @@ export function ChatbotWidget() {
         <section
           role="dialog"
           aria-label="BetPlatform customer support chat"
-          className="flex h-[min(590px,calc(100dvh-150px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-3xl border border-violet-300/20 bg-[#111a30] shadow-2xl shadow-violet-950/40 backdrop-blur-2xl"
+          className="bp-chat-panel flex h-[min(590px,calc(100dvh-150px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-3xl border border-violet-300/20 bg-[#111a30] shadow-2xl shadow-violet-950/40 backdrop-blur-2xl"
         >
           <header className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-violet-600/25 via-indigo-500/15 to-cyan-400/10 px-4 py-3">
             <div className="flex items-center gap-3">
@@ -178,7 +178,7 @@ export function ChatbotWidget() {
         aria-label={isOpen ? 'Close customer support chat' : 'Open customer support chat'}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((open) => !open)}
-        className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-400 text-white shadow-xl shadow-violet-950/40 transition hover:scale-105 hover:rotate-3 hover:brightness-110 md:h-14 md:w-14 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-[#0d1224]"
+        className="bp-chat-toggle flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-400 text-white shadow-xl shadow-violet-950/40 transition hover:scale-105 hover:rotate-3 hover:brightness-110 md:h-14 md:w-14 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-[#0d1224]"
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
       </button>
