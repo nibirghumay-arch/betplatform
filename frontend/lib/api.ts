@@ -16,8 +16,18 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
+    const requestUrl = err.config?.url ?? '';
+    const isPublicAuthRequest = /\/auth\/(login|register|refresh|logout)(?:\?|$)/.test(requestUrl);
+
+    // Invalid credentials are an expected login response. Do not reload the
+    // login page before its form can show the backend's useful error message.
+    if (
+      err.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      !isPublicAuthRequest
+    ) {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('auth');
       window.location.href = '/login';
     }
     return Promise.reject(err);
@@ -26,7 +36,10 @@ api.interceptors.response.use(
 
 export function apiError(err: unknown): string {
   if (axios.isAxiosError(err)) {
-    return err.response?.data?.message ?? err.message;
+    const message = err.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string') return message;
+    return err.message;
   }
   return 'Unknown error';
 }

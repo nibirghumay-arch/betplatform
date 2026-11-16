@@ -135,15 +135,38 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
-      select: { ...USER_SELECT, passwordHash: true },
-    });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    if (!user.isActive) throw new UnauthorizedException('Account is disabled');
+    const suppliedEmail = dto.email.trim();
+    const normalizedEmail = suppliedEmail.toLowerCase();
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    // Read every case-insensitive match instead of only the first one. Older
+    // releases stored the email exactly as it was typed, while newer releases
+    // normalize it to lowercase. PostgreSQL's unique index is case-sensitive,
+    // so older data can contain the same address with different casing.
+    const candidates = await this.prisma.user.findMany({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { ...USER_SELECT, passwordHash: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Match the password against each legacy candidate. This prevents a
+    // different-case duplicate from being selected before the actual account.
+    const matchingUsers: typeof candidates = [];
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(dto.password, candidate.passwordHash)) {
+        matchingUsers.push(candidate);
+      }
+    }
+
+    if (matchingUsers.length === 0) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Prefer the exact casing the customer entered when duplicate legacy
+    // records exist; otherwise use the newest password-matching record.
+    const user = matchingUsers.find((candidate) => candidate.email === suppliedEmail)
+      ?? matchingUsers[0];
+
+    if (!user.isActive) throw new UnauthorizedException('Account is disabled');
 
     const { passwordHash: _pw, ...safeUser } = user;
     return this.issueTokenPair(safeUser);
