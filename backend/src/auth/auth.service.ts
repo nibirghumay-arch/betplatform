@@ -111,7 +111,7 @@ export class AuthService {
         });
 
         await tx.wallet.create({
-          data: { userId: user.id, walletType: WalletType.USER, currency: 'USD' },
+          data: { userId: user.id, walletType: WalletType.USER, currency: 'BDT' },
           select: { id: true },
         });
 
