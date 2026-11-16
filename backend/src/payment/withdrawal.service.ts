@@ -262,7 +262,7 @@ export class WithdrawalService {
       where: {
         id: withdrawal.id,
         status: WithdrawalStatus.PROCESSING,
-        transactionId: null,
+        transactionId: withdrawal.transactionId ?? null,
       },
       data: {
         status: WithdrawalStatus.COMPLETED,
