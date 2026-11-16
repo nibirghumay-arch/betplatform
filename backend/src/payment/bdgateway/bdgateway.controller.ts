@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
+import { IsOptional, IsString, Matches } from 'class-validator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { DepositService } from '../deposit.service';
 import { BdGatewayService } from './bdgateway.service';
@@ -23,7 +24,13 @@ interface RequestWithUser extends Request {
 }
 
 class SubmitBdGatewayTrxDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9]{6,20}$/)
   trxId!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^01[3-9]\\d{8}$/)
   customerMsisdn?: string;
 }
 
