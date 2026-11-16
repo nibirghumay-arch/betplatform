@@ -10,7 +10,6 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RawBodyRequest } from '@nestjs/common';
@@ -22,16 +21,16 @@ import { AdminRoleGuard } from '../auth/guards/admin-role.guard';
 import { WithdrawalService } from './withdrawal.service';
 import {
   RequestWithdrawalDto,
-  ApproveWithdrawalDto,
   RejectWithdrawalDto,
-  CancelWithdrawalDto,
   PaginationQueryDto,
 } from './dto/payment.dto';
 
+interface RequestWithUser extends Request {
+  user: { userId: string; email: string; role: string };
+}
+
 @ApiTags('Payment – Withdrawals')
 @ApiBearerAuth()
-interface RequestWithUser extends Request { user: { userId: string; role: string } };
-
 @Controller('payment/withdrawal')
 export class WithdrawalController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
@@ -56,12 +55,6 @@ export class WithdrawalController {
     return this.withdrawalService.cancel(id, request.user.userId);
   }
 
-  /**
-   * PSP-to-server webhook confirming payout settled.
-   * The ledger debit is recorded here — not on approval.
-   * Public: called by the PSP's servers, never by a logged-in user, so it
-   * must bypass the global JwtAuthGuard.
-   */
   @Public()
   @Post('webhook/:provider')
   @HttpCode(HttpStatus.OK)
@@ -92,12 +85,10 @@ export class WithdrawalController {
   }
 }
 
-// ─── Admin endpoints (separate controller prefix) ─────────────────────────────
-
 @ApiTags('Admin – Withdrawals')
 @ApiBearerAuth()
-@Controller('admin/withdrawal')
 @UseGuards(AdminRoleGuard)
+@Controller('admin/withdrawal')
 export class WithdrawalAdminController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 
