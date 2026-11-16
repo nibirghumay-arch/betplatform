@@ -45,6 +45,6 @@ export class BdGatewayAdminController {
     @Body() dto: UpdateBdGatewaySettingsDto,
     @Req() request: RequestWithUser,
   ) {
-    return this.config.saveAdminSettings(dto, request.user.userId);
+    return this.config.saveAdminSettings({ ...dto }, request.user.userId);
   }
 }
