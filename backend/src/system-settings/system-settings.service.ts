@@ -35,7 +35,9 @@ export class SystemSettingsService {
   }
 
   async getAll(): Promise<Record<string, unknown>> {
-    const rows = await this.prisma.systemSetting.findMany();
+    const rows = await this.prisma.systemSetting.findMany({
+      where: { NOT: { key: { startsWith: '__internal.' } } },
+    });
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }
 }
