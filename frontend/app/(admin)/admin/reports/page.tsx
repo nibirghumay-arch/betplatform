@@ -102,10 +102,10 @@ export default function ReportsPage() {
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {(
             [
-              { label: 'Total GGR', value: `$${totalGgr.toFixed(2)}`, color: 'text-green-400' },
-              { label: 'Total NGR', value: `$${totalNgr.toFixed(2)}`, color: 'text-emerald-400' },
-              { label: 'Total Deposits', value: `$${totalDeposits.toFixed(2)}`, color: 'text-blue-400' },
-              { label: 'Total Withdrawals', value: `$${totalWithdrawals.toFixed(2)}`, color: 'text-orange-400' },
+              { label: 'Total GGR', value: `৳ ${totalGgr.toFixed(2)}`, color: 'text-green-400' },
+              { label: 'Total NGR', value: `৳ ${totalNgr.toFixed(2)}`, color: 'text-emerald-400' },
+              { label: 'Total Deposits', value: `৳ ${totalDeposits.toFixed(2)}`, color: 'text-blue-400' },
+              { label: 'Total Withdrawals', value: `৳ ${totalWithdrawals.toFixed(2)}`, color: 'text-orange-400' },
             ] as { label: string; value: string; color: string }[]
           ).map(({ label, value, color }) => (
             <div key={label} className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -147,16 +147,16 @@ export default function ReportsPage() {
                   <tr key={r.period} className="border-b border-white/5 hover:bg-white/3">
                     <td className="py-2.5 pr-4 font-mono text-gray-300">{r.period}</td>
                     <td className="py-2.5 pr-4 text-right font-mono text-green-400">
-                      ${r.ggr}
+                      ৳ {r.ggr}
                     </td>
                     <td className="py-2.5 pr-4 text-right font-mono text-emerald-400">
-                      ${r.ngr}
+                      ৳ {r.ngr}
                     </td>
                     <td className="py-2.5 pr-4 text-right font-mono text-blue-400">
-                      ${r.totalDeposits}
+                      ৳ {r.totalDeposits}
                     </td>
                     <td className="py-2.5 text-right font-mono text-orange-400">
-                      ${r.totalWithdrawals}
+                      ৳ {r.totalWithdrawals}
                     </td>
                   </tr>
                 ))}
