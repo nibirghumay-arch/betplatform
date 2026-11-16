@@ -9,7 +9,8 @@
 # internally exactly as it does locally.
 #
 # Required environment variables (Site configuration → Environment):
-#   DATABASE_URL      pooled Postgres URL (Neon/Supabase pooler, port 6543)
+#   DATABASE_URL      pooled Postgres URL for application runtime
+#   DIRECT_DATABASE_URL direct Postgres URL for automatic production migrations (recommended)
 #   JWT_SECRET        openssl rand -hex 32
 #   CRON_SECRET       openssl rand -hex 32  (guards the internal cron route)
 #   API_PUBLIC_URL    https://<this-site>.netlify.app/api/v1
