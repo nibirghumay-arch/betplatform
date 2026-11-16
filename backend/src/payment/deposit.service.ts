@@ -332,7 +332,22 @@ export class DepositService {
       throw new BadRequestException('Enter a valid Bangladeshi mobile number');
     }
 
-    await this.bdGateway.submitTrxId(deposit.pspSessionId, trxId.trim(), customerMsisdn);
+    const customerTrxId = trxId.trim();
+    await this.prisma.deposit.update({
+      where: { id: depositId },
+      data: {
+        metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          customerTrxId,
+          customerMsisdn: customerMsisdn ?? null,
+          customerTrxSubmittedAt: new Date().toISOString(),
+          // A new customer TrxID invalidates any previous admin SMS check.
+          lastTrxCheck: null,
+          adminSmsTrxId: null,
+        }) as any,
+      },
+    });
+
+    await this.bdGateway.submitTrxId(deposit.pspSessionId, customerTrxId, customerMsisdn);
     const order = await this.bdGateway.getOrder(deposit.pspSessionId);
     if (order) await this.applyBdGatewayOrder(order, { depositId });
 
@@ -343,6 +358,180 @@ export class DepositService {
         ? 'Payment verified. Your wallet has been credited.'
         : 'TrxID submitted. Your payment is being verified; this page will update automatically.',
     };
+  }
+
+  private mergeBdGatewayMetadata(
+    metadata: unknown,
+    bdGatewayPatch: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const root = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? { ...(metadata as Record<string, unknown>) }
+      : {};
+    const existingBdGateway = root.bdGateway &&
+      typeof root.bdGateway === 'object' &&
+      !Array.isArray(root.bdGateway)
+      ? root.bdGateway as Record<string, unknown>
+      : {};
+
+    return {
+      ...root,
+      bdGateway: { ...existingBdGateway, ...bdGatewayPatch },
+    };
+  }
+
+  async checkBdGatewayDepositTrxAsAdmin(
+    depositId: string,
+    smsTrxId: string,
+    adminId: string,
+  ) {
+    const deposit = await this.findById(depositId);
+    if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
+      throw new BadRequestException('SMS TrxID verification is only available for BetPlatform BD gateway deposits');
+    }
+    if (deposit.status !== DepositStatus.PENDING_PAYMENT) {
+      throw new BadRequestException('Only pending deposits can be checked');
+    }
+
+    const submittedSmsTrxId = smsTrxId.trim();
+    if (!/^[A-Za-z0-9]{6,20}$/.test(submittedSmsTrxId)) {
+      throw new BadRequestException('Enter a valid 6–20 character SMS TrxID');
+    }
+
+    const root = deposit.metadata && typeof deposit.metadata === 'object' && !Array.isArray(deposit.metadata)
+      ? deposit.metadata as Record<string, unknown>
+      : {};
+    const bd = root.bdGateway && typeof root.bdGateway === 'object' && !Array.isArray(root.bdGateway)
+      ? root.bdGateway as Record<string, unknown>
+      : {};
+    const customerTrxId = typeof bd.customerTrxId === 'string' ? bd.customerTrxId.trim() : '';
+
+    if (!customerTrxId) {
+      throw new BadRequestException('The customer has not submitted a TrxID for this deposit yet');
+    }
+
+    const matches = customerTrxId.toUpperCase() === submittedSmsTrxId.toUpperCase();
+    const checkedAt = new Date().toISOString();
+    const check = {
+      customerTrxId,
+      adminSmsTrxId: submittedSmsTrxId,
+      matches,
+      checkedAt,
+      checkedBy: adminId,
+    };
+    const history = Array.isArray(bd.trxCheckHistory) ? bd.trxCheckHistory : [];
+    await this.prisma.deposit.update({
+      where: { id: depositId },
+      data: {
+        metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          adminSmsTrxId: submittedSmsTrxId,
+          lastTrxCheck: check,
+          trxCheckHistory: [...history, check].slice(-10),
+        }) as any,
+      },
+    });
+
+    return {
+      depositId,
+      matches,
+      customerTrxId,
+      adminSmsTrxId: submittedSmsTrxId,
+      status: deposit.status,
+      message: matches
+        ? 'TrxID matched. Review the deposit and press Approve to credit the wallet.'
+        : 'TrxID does not match. The deposit remains pending; correct the SMS TrxID and check again.',
+    };
+  }
+
+  async approveBdGatewayDepositAsAdmin(depositId: string, adminId: string) {
+    const deposit = await this.findById(depositId);
+    if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
+      throw new BadRequestException('Manual SMS approval is only available for BetPlatform BD gateway deposits');
+    }
+    if (deposit.status !== DepositStatus.PENDING_PAYMENT) {
+      throw new BadRequestException('Only pending deposits can be approved');
+    }
+
+    const root = deposit.metadata && typeof deposit.metadata === 'object' && !Array.isArray(deposit.metadata)
+      ? deposit.metadata as Record<string, unknown>
+      : {};
+    const bd = root.bdGateway && typeof root.bdGateway === 'object' && !Array.isArray(root.bdGateway)
+      ? root.bdGateway as Record<string, unknown>
+      : {};
+    const customerTrxId = typeof bd.customerTrxId === 'string' ? bd.customerTrxId.trim() : '';
+    const adminSmsTrxId = typeof bd.adminSmsTrxId === 'string' ? bd.adminSmsTrxId.trim() : '';
+    const check = bd.lastTrxCheck && typeof bd.lastTrxCheck === 'object'
+      ? bd.lastTrxCheck as Record<string, unknown>
+      : null;
+
+    if (
+      !customerTrxId ||
+      !adminSmsTrxId ||
+      !check ||
+      check.matches !== true ||
+      check.customerTrxId !== customerTrxId ||
+      check.adminSmsTrxId !== adminSmsTrxId ||
+      customerTrxId.toUpperCase() !== adminSmsTrxId.toUpperCase()
+    ) {
+      throw new BadRequestException('Check the SMS TrxID and confirm an exact match before approving this deposit');
+    }
+
+    const pspReference = `${BDGATEWAY_PROVIDER}:${customerTrxId.toUpperCase()}`;
+    const duplicate = await this.prisma.deposit.findUnique({ where: { pspReference } });
+    if (duplicate && duplicate.id !== depositId) {
+      throw new BadRequestException('This TrxID has already been used for another deposit');
+    }
+
+    await this.prisma.deposit.update({
+      where: { id: depositId },
+      data: {
+        metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          approvedBy: adminId,
+          approvedAt: new Date().toISOString(),
+          approvedSmsTrxId: adminSmsTrxId,
+        }) as any,
+      },
+    });
+
+    await this.settle(
+      pspReference,
+      new Decimal(deposit.amount.toString()),
+      'BDT',
+      depositId,
+      {
+        settlementMode: 'ADMIN_SMS_TRX_MATCH',
+        submittedTrxId: customerTrxId,
+        adminSmsTrxId,
+        checkedAt: check.checkedAt,
+        checkedBy: check.checkedBy,
+        approvedBy: adminId,
+      },
+    );
+
+    return this.findById(depositId);
+  }
+
+  async rejectBdGatewayDepositAsAdmin(depositId: string, reason: string, adminId: string) {
+    const deposit = await this.findById(depositId);
+    if (deposit.pspProvider !== BDGATEWAY_PROVIDER) {
+      throw new BadRequestException('Manual rejection is only available for BetPlatform BD gateway deposits');
+    }
+    if (deposit.status !== DepositStatus.PENDING_PAYMENT) {
+      throw new BadRequestException('Only pending deposits can be rejected');
+    }
+
+    const cleanReason = reason.trim() || 'Rejected by administrator';
+    await this.prisma.deposit.update({
+      where: { id: depositId },
+      data: {
+        metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          rejectedBy: adminId,
+          rejectedAt: new Date().toISOString(),
+          rejectionReason: cleanReason,
+        }) as any,
+      },
+    });
+    await this.markFailed(depositId, cleanReason);
+    return this.findById(depositId);
   }
 
   async getAdminDepositQueue(status?: DepositStatus, skip = 0, take = 50) {
@@ -419,36 +608,26 @@ export class DepositService {
       return;
     }
 
-    if (order.status === 'APPROVED') {
-      // The gateway only approves when a forwarded SMS matches BOTH the TrxID
-      // and the exact amount, so order.amountBdt is what actually arrived.
-      await this.settle(
-        order.submittedTrxId || order.reference,
-        new Decimal(deposit.amount.toString()),
-        'BDT',
-        deposit.id,
-        {
-          gatewayReference: order.reference,
-          gatewayProvider: order.provider,
-          trxId: order.submittedTrxId ?? null,
-          customerMsisdn: order.customerMsisdn ?? null,
-          receivingNumber: order.receivingNumber,
-        },
-      );
-      return;
-    }
+    // The external gateway's status is recorded for the admin, but it never
+    // credits a BetPlatform wallet. Final approval must happen in this site's
+    // Payments panel after the admin compares the customer's TrxID with the
+    // TrxID in the receiving mobile-banking SMS.
+    await this.prisma.deposit.update({
+      where: { id: deposit.id },
+      data: {
+        metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          gatewayReportedStatus: order.status,
+          gatewaySubmittedTrxId: order.submittedTrxId ?? null,
+          gatewayCheckedAt: new Date().toISOString(),
+          gatewayCustomerMsisdn: order.customerMsisdn ?? null,
+          gatewayReceivingNumber: order.receivingNumber,
+        }) as any,
+      },
+    });
 
-    if (order.status === 'REJECTED' || order.status === 'EXPIRED') {
-      await this.markFailed(
-        deposit.id,
-        order.status === 'EXPIRED'
-          ? 'Gateway order expired before the payment could be verified'
-          : 'Payment rejected by the gateway operator',
-      );
-      return;
-    }
-
-    this.logger.debug(`Gateway order ${order.reference} is still ${order.status} — nothing to do`);
+    this.logger.log(
+      `Gateway order ${order.reference} reported ${order.status}; awaiting admin SMS TrxID verification for deposit ${deposit.id}`,
+    );
   }
 
   private async findBdGatewayDeposit(reference: string, metadata?: Record<string, unknown> | null) {
