@@ -9,17 +9,3 @@ export class CreateWalletDto {
   @Length(3, 3)
   currency?: string;
 }
-
-export class MigrateWalletCurrencyDto {
-  @IsString()
-  @Length(1, 128)
-  userId: string;
-
-  @IsString()
-  @Length(1, 32)
-  bdtPerUsd: string;
-
-  @IsString()
-  @Length(8, 500)
-  reason: string;
-}
