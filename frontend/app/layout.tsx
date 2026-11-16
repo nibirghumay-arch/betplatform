@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#0f0f0f] text-white antialiased">
+      <body className="min-h-screen text-white antialiased">
         <Providers>
           {children}
           <ChatbotWidget />

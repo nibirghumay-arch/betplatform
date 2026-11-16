@@ -1,23 +1,23 @@
 import clsx from 'clsx';
 
 const variants: Record<string, string> = {
-  COMPLETED: 'bg-green-900/50 text-green-300 border-green-700',
-  PENDING: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
-  PENDING_REVIEW: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
-  PROCESSING: 'bg-blue-900/50 text-blue-300 border-blue-700',
-  FAILED: 'bg-red-900/50 text-red-300 border-red-700',
-  CANCELLED: 'bg-gray-800 text-gray-400 border-gray-600',
-  ACTIVE: 'bg-green-900/50 text-green-300 border-green-700',
-  WAGERING: 'bg-amber-900/50 text-amber-300 border-amber-700',
-  UNREAD: 'bg-blue-900/50 text-blue-300 border-blue-700',
-  READ: 'bg-gray-800 text-gray-400 border-gray-600',
-  DEFAULT: 'bg-white/10 text-gray-300 border-white/20',
+  COMPLETED: 'bg-emerald-400/10 text-emerald-300 border-emerald-300/25',
+  PENDING: 'bg-amber-300/10 text-amber-200 border-amber-300/25',
+  PENDING_REVIEW: 'bg-amber-300/10 text-amber-200 border-amber-300/25',
+  PROCESSING: 'bg-sky-400/10 text-sky-200 border-sky-300/25',
+  FAILED: 'bg-rose-400/10 text-rose-200 border-rose-300/25',
+  CANCELLED: 'bg-slate-400/10 text-slate-300 border-slate-300/20',
+  ACTIVE: 'bg-lime-300/10 text-lime-200 border-lime-300/25',
+  WAGERING: 'bg-orange-300/10 text-orange-200 border-orange-300/25',
+  UNREAD: 'bg-cyan-300/10 text-cyan-200 border-cyan-300/25',
+  READ: 'bg-slate-400/10 text-slate-300 border-slate-300/20',
+  DEFAULT: 'bg-violet-300/10 text-violet-200 border-violet-300/20',
 };
 
 export function Badge({ label }: { label: string }) {
   const cls = variants[label] ?? variants.DEFAULT;
   return (
-    <span className={clsx('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', cls)}>
+    <span className={clsx('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide', cls)}>
       {label}
     </span>
   );

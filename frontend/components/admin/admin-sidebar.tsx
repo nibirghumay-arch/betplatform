@@ -46,16 +46,16 @@ export function AdminSidebar({ isOpen = true, onClose }: AdminSidebarProps) {
       <div
         className={clsx(
           'fixed inset-y-0 left-0 z-40 flex w-52 flex-shrink-0 flex-col',
-          'border-r border-white/5 bg-[#0d0d14]',
+          'border-r border-white/10 bg-gradient-to-b from-[#171f39] via-[#11182e] to-[#0d1427] shadow-2xl shadow-black/20',
           'transform transition-transform duration-200 ease-in-out',
           isOpen ? 'translate-x-0' : '-translate-x-full',
           'md:relative md:translate-x-0',
         )}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.025] px-5 py-5">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">
               Admin Console
             </p>
             <p className="mt-0.5 text-base font-bold text-white">Platform</p>
@@ -81,10 +81,10 @@ export function AdminSidebar({ isOpen = true, onClose }: AdminSidebarProps) {
                 href={href}
                 onClick={onClose}
                 className={clsx(
-                  'flex items-center rounded-lg px-3 py-2 text-sm transition-colors',
+                  'flex items-center rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200',
                   active
-                    ? 'bg-indigo-600/20 font-medium text-indigo-300'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                    ? 'bg-gradient-to-r from-violet-500/20 to-cyan-400/10 font-semibold text-white ring-1 ring-violet-300/20'
+                    : 'text-slate-300 hover:bg-white/[0.07] hover:text-white hover:translate-x-0.5',
                 )}
               >
                 {label}
@@ -94,7 +94,7 @@ export function AdminSidebar({ isOpen = true, onClose }: AdminSidebarProps) {
         </nav>
 
         {/* User */}
-        <div className="border-t border-white/5 px-3 py-3">
+        <div className="border-t border-white/10 bg-black/10 px-3 py-4">
           <div className="mb-2 px-1">
             <p className="truncate text-xs font-medium text-white">{user?.username}</p>
             <p className="text-[10px] text-indigo-400">{user?.role}</p>

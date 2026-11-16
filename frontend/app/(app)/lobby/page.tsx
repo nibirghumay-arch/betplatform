@@ -18,10 +18,10 @@ function GameCard({ game, onLaunch, launching }: { game: GameDefinition; onLaunc
     <button
       onClick={onLaunch}
       disabled={launching}
-      className="group relative flex flex-col overflow-hidden rounded-xl border border-white/10 bg-white/5 transition-all hover:border-amber-500/40 hover:bg-white/10 disabled:opacity-60"
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1c2542] to-[#11182d] shadow-lg shadow-black/15 transition-all duration-300 hover:-translate-y-1 hover:border-violet-300/40 hover:shadow-xl hover:shadow-violet-950/25 disabled:opacity-60"
     >
       {/* Thumbnail */}
-      <div className="aspect-[4/3] w-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center relative overflow-hidden">
+      <div className="aspect-[4/3] w-full bg-gradient-to-br from-violet-950 via-indigo-950 to-cyan-950 flex items-center justify-center relative overflow-hidden">
         {game.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={game.thumbnailUrl} alt={game.name} className="h-full w-full object-cover" />
@@ -29,7 +29,7 @@ function GameCard({ game, onLaunch, launching }: { game: GameDefinition; onLaunc
           <span className="text-4xl opacity-30">🎮</span>
         )}
         {game.featured && (
-          <span className="absolute top-2 left-2 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-black">
+          <span className="absolute top-2 left-2 rounded-lg border border-amber-200/30 bg-gradient-to-r from-amber-300 to-orange-400 px-2 py-1 text-[10px] font-extrabold tracking-wider text-[#251507] shadow-lg">
             FEATURED
           </span>
         )}
@@ -39,15 +39,15 @@ function GameCard({ game, onLaunch, launching }: { game: GameDefinition; onLaunc
           </div>
         )}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-          <span className="rounded-full bg-amber-500 px-4 py-1.5 text-sm font-bold text-black">Play</span>
+          <span className="rounded-full bg-gradient-to-r from-violet-500 to-cyan-400 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-violet-950/40">Play</span>
         </div>
       </div>
 
       {/* Info */}
-      <div className="p-3 text-left">
-        <p className="truncate text-sm font-medium text-white">{game.name}</p>
+      <div className="p-3.5 text-left">
+        <p className="truncate text-sm font-semibold text-slate-50">{game.name}</p>
         {game.rtp != null && (
-          <p className="text-xs text-gray-500 mt-0.5">RTP {parseFloat(String(game.rtp)).toFixed(1)}%</p>
+          <p className="text-xs text-cyan-200/70 mt-1">RTP {parseFloat(String(game.rtp)).toFixed(1)}%</p>
         )}
       </div>
     </button>
@@ -124,8 +124,8 @@ export default function LobbyPage() {
           className={clsx(
             'flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
             activeCategory === ALL
-              ? 'bg-amber-500 text-black'
-              : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white',
+              ? 'bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400 text-white shadow-lg shadow-violet-950/25'
+              : 'border border-white/10 bg-white/[0.035] text-slate-300 hover:border-violet-300/25 hover:bg-violet-400/10 hover:text-white',
           )}
         >
           All Games
@@ -149,10 +149,10 @@ export default function LobbyPage() {
       {/* Featured section — only shown on "All" tab with no search */}
       {activeCategory === ALL && !search && featured.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-400">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-rose-300">
             Featured
           </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
             {featured.map((game) => (
               <GameCard
                 key={game.id}

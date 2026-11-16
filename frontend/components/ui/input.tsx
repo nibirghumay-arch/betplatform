@@ -22,7 +22,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={clsx(
-            'rounded-lg border bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 transition focus:outline-none focus:ring-2',
+            'rounded-xl border bg-[#10172b]/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 transition focus:outline-none focus:ring-2 shadow-inner shadow-black/10',
             error
               ? 'border-red-500 focus:ring-red-500'
               : 'border-white/10 focus:border-amber-500 focus:ring-amber-500/30',

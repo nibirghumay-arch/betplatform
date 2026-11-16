@@ -120,7 +120,7 @@ function DepositCard() {
             <label className="text-sm font-medium text-gray-300">Payment Method</label>
             <select
               {...register('pspProvider')}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+              className="gateway-select rounded-xl border border-white/10 bg-[#10172b]/80 px-3.5 py-2.5 text-sm text-white focus:border-cyan-300 focus:outline-none"
             >
               <option value="bdgateway" disabled={!bdGatewayOptions?.enabled}>
                 {bdGatewayOptions?.enabled ? 'bKash / Nagad / Rocket / Upay — BetPlatform checkout' : 'BetPlatform BD gateway — not configured'}
@@ -513,12 +513,12 @@ export default function WalletPage() {
       <h1 className="mb-6 text-2xl font-bold text-white">Wallet</h1>
 
       {/* Balance hero */}
-      <div className="mb-6 rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-900/20 to-amber-800/10 p-6">
-        <p className="text-sm text-amber-400/70">Available Balance (BDT)</p>
+      <div className="wallet-balance-hero mb-6 rounded-3xl border border-violet-300/20 bg-gradient-to-br from-violet-500/20 via-indigo-500/10 to-cyan-400/10 p-5 shadow-xl shadow-violet-950/20 sm:p-7">
+        <p className="text-sm font-semibold tracking-wide text-cyan-100/80">Available Balance (BDT)</p>
         {isLoading ? (
           <Spinner className="mt-2" />
         ) : (
-          <p className="mt-1 text-4xl font-bold text-amber-400">
+          <p className="mt-1 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
             {balance ? `৳ ${parseFloat(balance.balance).toFixed(2)}` : '—'}
           </p>
         )}

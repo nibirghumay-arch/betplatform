@@ -79,16 +79,16 @@ export function ChatbotWidget() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[100] flex flex-col items-end gap-3">
+    <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-3 z-[100] flex flex-col items-end gap-3 sm:right-5 md:bottom-5">
       {isOpen && (
         <section
           role="dialog"
           aria-label="BetPlatform customer support chat"
-          className="flex h-[min(620px,calc(100dvh-110px))] w-[min(390px,calc(100vw-28px))] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#151515] shadow-2xl shadow-black/60"
+          className="bp-chat-panel flex h-[min(590px,calc(100dvh-150px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-3xl border border-violet-300/20 bg-[#111a30] shadow-2xl shadow-violet-950/40 backdrop-blur-2xl"
         >
-          <header className="flex items-center justify-between border-b border-white/10 bg-[#1c1c1c] px-4 py-3">
+          <header className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-violet-600/25 via-indigo-500/15 to-cyan-400/10 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400/25 to-cyan-300/15 text-cyan-100 shadow-inner">
                 <Bot size={21} />
               </div>
               <div>
@@ -115,7 +115,7 @@ export function ChatbotWidget() {
                 <div
                   className={`max-w-[86%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                     message.role === 'user'
-                      ? 'rounded-br-md bg-amber-500 text-black'
+                      ? 'rounded-br-md bg-gradient-to-br from-violet-500 to-indigo-500 text-white shadow-lg shadow-violet-950/20'
                       : 'rounded-bl-md border border-white/10 bg-white/[0.06] text-gray-200'
                   }`}
                 >
@@ -138,7 +138,7 @@ export function ChatbotWidget() {
                     key={question}
                     type="button"
                     onClick={() => void sendMessage(question)}
-                    className="rounded-full border border-amber-500/30 px-3 py-2 text-left text-xs text-amber-200 transition hover:bg-amber-500/10"
+                    className="rounded-full border border-violet-300/25 bg-violet-400/[0.06] px-3 py-2 text-left text-xs text-violet-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
                   >
                     {question}
                   </button>
@@ -147,8 +147,8 @@ export function ChatbotWidget() {
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="border-t border-white/10 bg-[#1b1b1b] p-3">
-            <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-black/30 p-2 focus-within:border-amber-500/60">
+          <form onSubmit={handleSubmit} className="border-t border-white/10 bg-[#10172b] p-3">
+            <div className="flex items-end gap-2 rounded-xl border border-white/10 bg-black/25 p-2 focus-within:border-cyan-300/60 focus-within:shadow-[0_0_0_3px_rgba(67,224,208,0.09)]">
               <textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -163,7 +163,7 @@ export function ChatbotWidget() {
                 type="submit"
                 disabled={!draft.trim() || isSending}
                 aria-label="Send message"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500 text-black transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-300 to-teal-400 text-[#07151b] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Send size={16} />
               </button>
@@ -178,7 +178,7 @@ export function ChatbotWidget() {
         aria-label={isOpen ? 'Close customer support chat' : 'Open customer support chat'}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((open) => !open)}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500 text-black shadow-lg shadow-amber-950/40 transition hover:scale-105 hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-[#0f0f0f]"
+        className="bp-chat-toggle flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-400 text-white shadow-xl shadow-violet-950/40 transition hover:scale-105 hover:rotate-3 hover:brightness-110 md:h-14 md:w-14 focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 focus:ring-offset-[#0d1224]"
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
       </button>

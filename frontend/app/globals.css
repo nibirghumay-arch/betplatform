@@ -1,20 +1,260 @@
+/* BetPlatform visual theme */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #0f0f0f;
-  --foreground: #f0f0f0;
+  color-scheme: dark;
+  --background: #0a0e1d;
+  --foreground: #f5f6ff;
+  --surface: #141a2e;
+  --surface-raised: #1a2340;
+  --line: rgba(177, 190, 255, 0.13);
+  --muted: #98a3c4;
+  --violet: #8b72ff;
+  --aqua: #43e0d0;
+  --coral: #ff718e;
+  --amber: #ffc45c;
+  --lime: #c2f26b;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  background: var(--background);
 }
 
 body {
+  min-height: 100vh;
   color: var(--foreground);
-  background: var(--background);
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(ellipse at 8% -8%, rgba(104, 83, 255, 0.19), transparent 38rem),
+    radial-gradient(ellipse at 95% 14%, rgba(39, 211, 199, 0.10), transparent 32rem),
+    linear-gradient(145deg, #0a0e1d 0%, #0d1224 52%, #0a1020 100%);
+  background-attachment: fixed;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { color: #080c18; background: #8de9dc; }
+
+a, button, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, input, select, textarea {
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--aqua);
+  outline-offset: 3px;
+}
+
+main {
+  min-width: 0;
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(115, 94, 255, 0.055), transparent 34rem);
+}
+
+main > div.mx-auto.px-6.py-6 {
+  width: 100%;
+  padding-left: clamp(1rem, 3vw, 2rem);
+  padding-right: clamp(1rem, 3vw, 2rem);
+  padding-top: clamp(1.25rem, 3vw, 2rem);
+  padding-bottom: clamp(2rem, 4vw, 3rem);
+  animation: bp-page-in 420ms ease both;
+}
+
+.bp-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line) !important;
+  border-radius: 1.25rem !important;
+  background:
+    linear-gradient(145deg, rgba(27, 35, 62, 0.93), rgba(17, 23, 42, 0.96)) !important;
+  box-shadow:
+    0 18px 48px rgba(2, 5, 17, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(16px);
+  transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+}
+
+.bp-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(67,224,208,.35), rgba(139,114,255,.48), transparent);
+  pointer-events: none;
+}
+
+.bp-card:hover {
+  border-color: rgba(139, 114, 255, 0.28) !important;
+  box-shadow: 0 22px 55px rgba(3, 7, 24, 0.30), 0 0 0 1px rgba(139, 114, 255, 0.035);
+}
+
+.bp-card-title {
+  letter-spacing: -0.02em;
+  color: #f5f6ff;
+}
+
+.bp-button {
+  border-radius: 0.9rem !important;
+  letter-spacing: -0.01em;
+  box-shadow: 0 7px 18px rgba(1, 5, 20, 0.18);
+  transform: translateY(0);
+}
+.bp-button:not(:disabled):hover { transform: translateY(-2px); }
+.bp-button:not(:disabled):active { transform: translateY(0) scale(0.985); }
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: 0.85rem;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(67, 224, 208, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(67, 224, 208, 0.12);
+}
+select option {
+  color: #f4f6ff;
+  background: #17203a;
+}
+select option[value="BKASH"] { color: #ff78af; }
+select option[value="NAGAD"] { color: #ffad64; }
+select option[value="ROCKET"] { color: #c0a0ff; }
+select option[value="UPAY"] { color: #7dc4ff; }
+select option[value="sslcommerz"] { color: #6be4dd; }
+select option[value="stripe"] { color: #a79aff; }
+select option[value="paypal"] { color: #7cc5ff; }
+
+table { border-collapse: separate; border-spacing: 0; }
+thead th { color: #9da9cc; font-weight: 600; letter-spacing: 0.025em; }
+tbody tr { transition: background-color 160ms ease; }
+tbody tr:hover { background-color: rgba(126, 110, 255, 0.055); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: rgba(5, 9, 23, 0.5); }
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 99px;
+  background: rgba(129, 145, 190, 0.35);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(139, 114, 255, 0.62); background-clip: padding-box; }
+
+@keyframes bp-page-in {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bp-soft-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes bp-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(139, 114, 255, 0); }
+  50% { box-shadow: 0 0 28px rgba(139, 114, 255, 0.16); }
+}
+@keyframes bp-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bp-animate-in { animation: bp-page-in 420ms ease both; }
+.bp-soft-float { animation: bp-soft-float 4.5s ease-in-out infinite; }
+
+@media (max-width: 767px) {
+  main > div.mx-auto.px-6.py-6 { max-width: 100%; }
+  .bp-card { border-radius: 1.05rem !important; }
+  table { font-size: 0.82rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+}
+
+
+/* Shared surfaces used by the existing dashboards and forms */
+main [class~="bg-white/5"],
+main [class~="bg-white/[0.03]"],
+main [class~="bg-white/[0.04]"] {
+  background-color: rgba(25, 34, 60, 0.72) !important;
+  border-color: rgba(166, 181, 235, 0.13) !important;
+}
+main [class~="bg-white/10"] {
+  background-color: rgba(126, 141, 191, 0.12) !important;
+}
+main [class~="border-white/10"] { border-color: rgba(166, 181, 235, 0.15) !important; }
+
+.gateway-select option[value="BKASH"],
+.gateway-select option[value="bdgateway"] { color: #ff83b5; background: #24152d; }
+.gateway-select option[value="NAGAD"] { color: #ffb36e; background: #2b1c23; }
+.gateway-select option[value="ROCKET"] { color: #c7a4ff; background: #211934; }
+.gateway-select option[value="UPAY"] { color: #83caff; background: #14253a; }
+.gateway-select option[value="MCASH"] { color: #81e4d1; background: #12302f; }
+.gateway-select option[value="TAP"] { color: #8fd0ff; background: #14253a; }
+.gateway-select option[value="sslcommerz"] { color: #67e2d7; background: #12302f; }
+.gateway-select option[value="stripe"] { color: #b7a5ff; background: #211934; }
+.gateway-select option[value="paypal"] { color: #87caff; background: #14253a; }
+
+main h1 {
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+main h2 { letter-spacing: -0.025em; }
+
+@media (max-width: 767px) {
+  main > div[class*="px-"] {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
+  main {
+    overscroll-behavior-y: contain;
+  }
+  table { white-space: nowrap; }
+}
+
+@media (max-width: 420px) {
+  .bp-card { padding: 1rem; }
+  main h1 { font-size: 1.5rem; }
+}
+
+.wallet-balance-hero {
+  position: relative;
+  overflow: hidden;
+}
+.wallet-balance-hero::after {
+  content: "";
+  position: absolute;
+  width: 15rem;
+  height: 15rem;
+  top: -9rem;
+  right: -3rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(67,224,208,.17), transparent 68%);
+  pointer-events: none;
+}
+.bp-chat-panel { animation: bp-pop 230ms cubic-bezier(.2,.8,.2,1) both; }
+.bp-chat-toggle { animation: bp-glow 3.8s ease-in-out infinite; }
+@media (max-width: 767px) {
+  .wallet-balance-hero { padding: 1.15rem; }
 }
