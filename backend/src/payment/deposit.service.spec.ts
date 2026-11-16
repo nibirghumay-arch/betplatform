@@ -634,4 +634,157 @@ describe('DepositService', () => {
       );
     });
   });
+  describe('admin BD gateway SMS TrxID verification', () => {
+    const pendingDeposit = {
+      id: 'dep-bd-1',
+      userId: 'user-1',
+      pspProvider: 'bdgateway',
+      status: DepositStatus.PENDING_PAYMENT,
+      amount: '500.00000000',
+      metadata: {
+        bdGateway: {
+          customerTrxId: 'CUSTOMER12345',
+          receivingNumber: '01712345678',
+        },
+      },
+    };
+
+    it('stores the admin SMS TrxID and reports a mismatch without approving', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.findUnique.mockResolvedValue(pendingDeposit);
+      prisma.deposit.update.mockResolvedValue({});
+      const svc = makeService({ prisma });
+
+      const result = await svc.checkBdGatewayDepositTrxAsAdmin(
+        'dep-bd-1',
+        'WRONG123456',
+        'admin-1',
+      );
+
+      expect(result.matches).toBe(false);
+      expect(result.status).toBe(DepositStatus.PENDING_PAYMENT);
+      expect(result.message).toContain('remains pending');
+      expect(prisma.deposit.update).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 'dep-bd-1' },
+        data: {
+          metadata: expect.objectContaining({
+            bdGateway: expect.objectContaining({
+              customerTrxId: 'CUSTOMER12345',
+              adminSmsTrxId: 'WRONG123456',
+              lastTrxCheck: expect.objectContaining({
+                matches: false,
+                checkedBy: 'admin-1',
+              }),
+            }),
+          }),
+        },
+      }));
+    });
+
+    it('allows the admin to replace a wrong SMS TrxID and check again', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.findUnique.mockResolvedValue(pendingDeposit);
+      prisma.deposit.update.mockResolvedValue({});
+      const svc = makeService({ prisma });
+
+      const result = await svc.checkBdGatewayDepositTrxAsAdmin(
+        'dep-bd-1',
+        'customer12345',
+        'admin-1',
+      );
+
+      expect(result.matches).toBe(true);
+      expect(result.message).toContain('press Approve');
+      expect(prisma.deposit.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            bdGateway: expect.objectContaining({
+              adminSmsTrxId: 'customer12345',
+              lastTrxCheck: expect.objectContaining({ matches: true }),
+            }),
+          }),
+        }),
+      }));
+    });
+
+    it('does not approve a deposit until the latest SMS check matches', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.findUnique.mockResolvedValue(pendingDeposit);
+      const transactionService = makeTransactionService();
+      const svc = makeService({ prisma, transactionService });
+
+      await expect(svc.approveBdGatewayDepositAsAdmin('dep-bd-1', 'admin-1'))
+        .rejects.toThrow('Check the SMS TrxID');
+      expect(transactionService.deposit).not.toHaveBeenCalled();
+    });
+
+    it('credits the wallet only after the checked SMS TrxID matches', async () => {
+      const approvedReadyDeposit = {
+        ...pendingDeposit,
+        metadata: {
+          bdGateway: {
+            customerTrxId: 'CUSTOMER12345',
+            adminSmsTrxId: 'customer12345',
+            lastTrxCheck: {
+              customerTrxId: 'CUSTOMER12345',
+              adminSmsTrxId: 'customer12345',
+              matches: true,
+              checkedAt: '2026-11-17T10:00:00.000Z',
+              checkedBy: 'admin-1',
+            },
+          },
+        },
+      };
+      const completedDeposit = { ...approvedReadyDeposit, status: DepositStatus.COMPLETED };
+      const prisma = makePrisma();
+      prisma.deposit.findUnique
+        .mockResolvedValueOnce(approvedReadyDeposit) // findById
+        .mockResolvedValueOnce(null) // no duplicate pspReference
+        .mockResolvedValueOnce(approvedReadyDeposit) // settle claim
+        .mockResolvedValueOnce(completedDeposit); // final findById
+      prisma.deposit.updateMany.mockResolvedValue({ count: 1 });
+      prisma.deposit.update.mockResolvedValue({});
+      const transactionService = makeTransactionService();
+      const svc = makeService({ prisma, transactionService });
+
+      const result = await svc.approveBdGatewayDepositAsAdmin('dep-bd-1', 'admin-1');
+
+      expect(transactionService.deposit).toHaveBeenCalledWith(expect.objectContaining({
+        userId: 'user-1',
+        amount: expect.any(Decimal),
+        reference: 'deposit:dep-bd-1',
+        metadata: expect.objectContaining({
+          submittedTrxId: 'CUSTOMER12345',
+          adminSmsTrxId: 'customer12345',
+          approvedBy: 'admin-1',
+        }),
+      }));
+      expect(result.status).toBe(DepositStatus.COMPLETED);
+    });
+
+    it('rejects a pending deposit without crediting the wallet', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.findUnique.mockResolvedValue(pendingDeposit);
+      prisma.deposit.update.mockResolvedValue({});
+      prisma.deposit.updateMany.mockResolvedValue({ count: 1 });
+      const transactionService = makeTransactionService();
+      const svc = makeService({ prisma, transactionService });
+
+      const result = await svc.rejectBdGatewayDepositAsAdmin(
+        'dep-bd-1',
+        'SMS transaction was not found',
+        'admin-1',
+      );
+
+      expect(result.status).toBe(DepositStatus.PENDING_PAYMENT); // findById mock still reflects the pre-update row
+      expect(prisma.deposit.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        data: {
+          status: DepositStatus.FAILED,
+          failureReason: 'SMS transaction was not found',
+        },
+      }));
+      expect(transactionService.deposit).not.toHaveBeenCalled();
+    });
+  });
+
 });
