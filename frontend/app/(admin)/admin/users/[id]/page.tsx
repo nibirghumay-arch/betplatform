@@ -36,8 +36,6 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
   const qc = useQueryClient();
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
-  const [bdtPerUsd, setBdtPerUsd] = useState('');
-  const [migrationReason, setMigrationReason] = useState('');
 
   const { data: wallet, isLoading: walletLoading } = useUserWallet(id);
   const { data: txs = [], isLoading: txLoading } = useUserTransactions(id);
@@ -54,21 +52,6 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
       setActionError(apiError(err));
       setActionMsg('');
     },
-  });
-
-  const currencyMigration = useMutation({
-    mutationFn: () => api.post('/wallets/admin/migrate-to-bdt', {
-      userId: id, bdtPerUsd, reason: migrationReason,
-    }).then((r) => r.data),
-    onSuccess: (result) => {
-      setActionMsg(`Migrated USD ${result.previousBalance} to BDT ${result.newBalance} successfully.`);
-      setActionError('');
-      setBdtPerUsd('');
-      setMigrationReason('');
-      qc.invalidateQueries({ queryKey: ['admin', 'user-wallet', id] });
-      qc.invalidateQueries({ queryKey: ['admin', 'user-txs', id] });
-    },
-    onError: (err) => { setActionError(apiError(err)); setActionMsg(''); },
   });
 
   const act = (action: string) => {
@@ -111,28 +94,6 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
                   ৳ {parseFloat(wallet.balance).toFixed(2)}
                 </span>
               </div>
-            </div>
-          )}
-
-          {wallet?.currency === 'USD' && (
-            <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-              <h3 className="text-sm font-semibold text-white">Approve USD → BDT migration</h3>
-              <p className="my-2 text-xs text-gray-400">
-                Historical USD entries remain unchanged. The current balance is closed in USD and a converted BDT opening balance is recorded.
-              </p>
-              <label className="block text-xs text-gray-400">
-                Approved BDT rate per USD
-                <input value={bdtPerUsd} onChange={(e) => setBdtPerUsd(e.target.value)} inputMode="decimal" placeholder="e.g. 122.50" className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
-              </label>
-              <label className="mt-3 block text-xs text-gray-400">
-                Audit reason
-                <textarea value={migrationReason} onChange={(e) => setMigrationReason(e.target.value)} minLength={8} maxLength={500} rows={3} placeholder="Why is this migration approved?" className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white" />
-              </label>
-              <Button size="sm" className="mt-3" loading={currencyMigration.isPending}
-                disabled={!/^\\d+(?:\\.\\d{1,6})?$/.test(bdtPerUsd) || Number(bdtPerUsd) <= 0 || migrationReason.trim().length < 8}
-                onClick={() => { if (confirm('Approve this permanent USD to BDT accounting migration?')) currencyMigration.mutate(); }}>
-                Approve migration
-              </Button>
             </div>
           )}
 
