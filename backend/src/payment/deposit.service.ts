@@ -612,10 +612,21 @@ export class DepositService {
     // credits a BetPlatform wallet. Final approval must happen in this site's
     // Payments panel after the admin compares the customer's TrxID with the
     // TrxID in the receiving mobile-banking SMS.
+    const existingRoot = deposit.metadata && typeof deposit.metadata === 'object' && !Array.isArray(deposit.metadata)
+      ? deposit.metadata as Record<string, unknown>
+      : {};
+    const existingBd = existingRoot.bdGateway && typeof existingRoot.bdGateway === 'object' && !Array.isArray(existingRoot.bdGateway)
+      ? existingRoot.bdGateway as Record<string, unknown>
+      : {};
+    const previouslySubmittedTrxId = typeof existingBd.customerTrxId === 'string'
+      ? existingBd.customerTrxId
+      : order.submittedTrxId ?? null;
+
     await this.prisma.deposit.update({
       where: { id: deposit.id },
       data: {
         metadata: this.mergeBdGatewayMetadata(deposit.metadata, {
+          customerTrxId: previouslySubmittedTrxId,
           gatewayReportedStatus: order.status,
           gatewaySubmittedTrxId: order.submittedTrxId ?? null,
           gatewayCheckedAt: new Date().toISOString(),
