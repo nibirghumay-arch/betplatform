@@ -122,8 +122,12 @@ export class Html5GameAdapter implements ProviderAdapter, OnModuleInit {
   async createSession(
     userId: string,
     gameId: string,
-    currency = 'USD',
+    requestedCurrency = 'BDT',
   ): Promise<GameSessionData> {
+    if (requestedCurrency.toUpperCase() !== 'BDT') {
+      throw new BadRequestException('BetPlatform only supports BDT game sessions.');
+    }
+    const currency = 'BDT';
     const game = await this.prisma.gameDefinition.findUnique({
       where: { id: gameId },
       select: { id: true, isActive: true, providerId: true },

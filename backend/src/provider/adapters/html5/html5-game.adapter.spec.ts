@@ -32,18 +32,18 @@ const SESSION_STUB = {
   gameId: 'game-1',
   status: GameSessionStatus.ACTIVE,
   token: 'tok-abc',
-  currency: 'USD',
+  currency: 'BDT',
   expiresAt: new Date(Date.now() + 7_200_000),
   game: { gameUrl: 'slots/demo', slug: 'demo-slot' },
 };
 
-const WALLET_STUB = { id: 'wallet-1', userId: 'user-1', currency: 'USD' };
+const WALLET_STUB = { id: 'wallet-1', userId: 'user-1', currency: 'BDT' };
 
 const GAME_EVENT_SUCCESS = {
   success: true,
   transactionId: 'tx-1',
   balance: '90.00',
-  currency: 'USD',
+  currency: 'BDT',
   reference: 'bet:round-1',
 };
 
@@ -69,7 +69,7 @@ function buildPrismaMock() {
 function buildWalletMock() {
   return {
     getWalletByUserId: jest.fn().mockResolvedValue(WALLET_STUB),
-    getBalance: jest.fn().mockResolvedValue({ walletId: 'wallet-1', balance: '100.00', currency: 'USD' }),
+    getBalance: jest.fn().mockResolvedValue({ walletId: 'wallet-1', balance: '100.00', currency: 'BDT' }),
   } as unknown as WalletService;
 }
 
@@ -185,7 +185,7 @@ describe('Html5GameAdapter', () => {
         token: 'tok-xyz',
         gameId: 'game-1',
         userId: 'user-1',
-        currency: 'USD',
+        currency: 'BDT',
         expiresAt: new Date(Date.now() + 7_200_000),
       });
     });
@@ -239,12 +239,9 @@ describe('Html5GameAdapter', () => {
       );
     });
 
-    it('uses the supplied currency', async () => {
-      await adapter.createSession('user-1', 'game-1', 'EUR');
-      expect(prisma.gameSession.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ currency: 'EUR' }),
-        }),
+    it('rejects a supplied non-BDT currency', async () => {
+      await expect(adapter.createSession('user-1', 'game-1', 'EUR')).rejects.toThrow(
+        'BetPlatform only supports BDT game sessions',
       );
     });
   });
@@ -339,7 +336,7 @@ describe('Html5GameAdapter', () => {
       const result = await adapter.syncBalance('user-1');
       expect(walletService.getBalance).toHaveBeenCalledWith('user-1');
       expect(result.balance).toBe('100.00');
-      expect(result.currency).toBe('USD');
+      expect(result.currency).toBe('BDT');
       expect(result.walletId).toBe('wallet-1');
       expect(result.userId).toBe('user-1');
     });

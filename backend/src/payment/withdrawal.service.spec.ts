@@ -33,12 +33,12 @@ function makeWalletService(overrides: Record<string, any> = {}) {
   return {
     getWalletByUserId: jest.fn().mockResolvedValue({
       id: 'wallet-1',
-      currency: 'USD',
+      currency: 'BDT',
       isActive: true,
       isFrozen: false,
     }),
     assertWalletActive: jest.fn().mockResolvedValue(undefined),
-    getBalance: jest.fn().mockResolvedValue({ balance: '500.00', currency: 'USD' }),
+    getBalance: jest.fn().mockResolvedValue({ balance: '500.00', currency: 'BDT' }),
     ...overrides,
   } as any;
 }
@@ -83,7 +83,7 @@ function makeWithdrawal(
     id,
     userId,
     amount: new Decimal(amount),
-    currency: 'USD',
+    currency: 'BDT',
     pspProvider: 'stripe',
     status,
     payoutDetails: { iban: 'DE00...' },
@@ -141,9 +141,36 @@ describe('WithdrawalService', () => {
       expect(result.status).toBe(WithdrawalStatus.PENDING_REVIEW);
     });
 
+    it('stores legacy-wallet withdrawal requests in BDT', async () => {
+      const prisma = makePrisma();
+      prisma.withdrawal.create.mockResolvedValue({ id: 'w-bdt-legacy', status: WithdrawalStatus.PENDING_KYC });
+      const walletService = makeWalletService({
+        getWalletByUserId: jest.fn().mockResolvedValue({
+          id: 'wallet-legacy-usd',
+          currency: 'USD',
+          isActive: true,
+          isFrozen: false,
+        }),
+      });
+
+      const svc = makeService({ prisma, walletService });
+      await svc.request(baseParams);
+
+      expect(prisma.withdrawal.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ currency: 'BDT' }),
+      }));
+    });
+
+    it('rejects an explicitly requested non-BDT withdrawal currency', async () => {
+      const svc = makeService();
+      await expect(svc.request({ ...baseParams, currency: 'USD' })).rejects.toThrow(
+        'BetPlatform only supports BDT withdrawals',
+      );
+    });
+
     it('throws BadRequestException when balance is insufficient', async () => {
       const walletService = makeWalletService({
-        getBalance: jest.fn().mockResolvedValue({ balance: '50.00', currency: 'USD' }),
+        getBalance: jest.fn().mockResolvedValue({ balance: '50.00', currency: 'BDT' }),
       });
       const svc = makeService({ walletService });
 

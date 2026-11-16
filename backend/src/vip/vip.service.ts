@@ -34,16 +34,16 @@ export class VipService {
     const wagerDecimal = new Decimal(amount);
 
     const progress = await this.getOrCreateProgress(userId);
-    const newTotal = new Decimal(progress.totalWagerUsd.toString()).plus(wagerDecimal);
-    const newPeriod = new Decimal(progress.periodWagerUsd.toString()).plus(wagerDecimal);
+    const newTotal = new Decimal(progress.totalWagerBdt.toString()).plus(wagerDecimal);
+    const newPeriod = new Decimal(progress.periodWagerBdt.toString()).plus(wagerDecimal);
 
     const nextTier = await this.findNextTier(progress.currentTier, newTotal);
 
     await this.prisma.vipProgress.update({
       where: { userId },
       data: {
-        totalWagerUsd: newTotal.toFixed(2),
-        periodWagerUsd: newPeriod.toFixed(2),
+        totalWagerBdt: newTotal.toFixed(2),
+        periodWagerBdt: newPeriod.toFixed(2),
         ...(nextTier ? { currentTier: nextTier.tier, lastPromotedAt: new Date() } : {}),
       },
     });
@@ -80,7 +80,7 @@ export class VipService {
   async createLevel(params: {
     tier: number;
     name: string;
-    minWagerUsd: string;
+    minWagerBdt: string;
     bonusAmount: string;
     cashbackRate: string;
   }) {
@@ -88,7 +88,7 @@ export class VipService {
       data: {
         tier: params.tier,
         name: params.name,
-        minWagerUsd: params.minWagerUsd,
+        minWagerBdt: params.minWagerBdt,
         bonusAmount: params.bonusAmount,
         cashbackRate: params.cashbackRate,
       },
@@ -97,7 +97,7 @@ export class VipService {
 
   async updateLevel(
     tier: number,
-    data: Partial<{ name: string; minWagerUsd: string; bonusAmount: string; cashbackRate: string; isActive: boolean }>,
+    data: Partial<{ name: string; minWagerBdt: string; bonusAmount: string; cashbackRate: string; isActive: boolean }>,
   ) {
     const level = await this.prisma.vipLevel.findUnique({ where: { tier } });
     if (!level) throw new NotFoundException(`VIP level tier ${tier} not found`);
@@ -110,7 +110,7 @@ export class VipService {
     const existing = await this.prisma.vipProgress.findUnique({ where: { userId } });
     if (existing) return existing;
     return this.prisma.vipProgress.create({
-      data: { userId, currentTier: 0, totalWagerUsd: '0', periodWagerUsd: '0' },
+      data: { userId, currentTier: 0, totalWagerBdt: '0', periodWagerBdt: '0' },
     });
   }
 
@@ -120,7 +120,7 @@ export class VipService {
       where: {
         isActive: true,
         tier: { gt: currentTier },
-        minWagerUsd: { lte: newTotal.toFixed(2) },
+        minWagerBdt: { lte: newTotal.toFixed(2) },
       },
       orderBy: { tier: 'desc' },
       take: 1,

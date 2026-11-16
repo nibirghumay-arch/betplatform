@@ -300,8 +300,7 @@ export default function PaymentsPage() {
                         <p className="mt-1 font-mono text-[10px] text-gray-600">{deposit.id.slice(0, 12)}…</p>
                       </td>
                       <td className="py-3 pr-4 font-mono text-amber-400">
-                        {deposit.currency === 'BDT' ? '৳' : deposit.currency + ' '}
-                        {Number(deposit.amount).toFixed(2)}
+                        ৳ {Number(deposit.amount).toFixed(2)}
                       </td>
                       <td className="py-3 pr-4 text-gray-300">{deposit.paymentChannel || deposit.pspProvider}</td>
                       <td className="py-3 pr-4"><Badge label={deposit.status} /></td>
@@ -383,7 +382,7 @@ export default function PaymentsPage() {
                     <tr key={withdrawal.id} className="border-b border-white/5 hover:bg-white/3">
                       <td className="py-2.5 pr-4 font-mono text-xs text-gray-500">{withdrawal.id.slice(0, 8)}…</td>
                       <td className="py-2.5 pr-4 font-mono text-xs text-gray-300">{withdrawal.userId.slice(0, 8)}…</td>
-                      <td className="py-2.5 pr-4 text-right font-mono text-amber-400">{withdrawal.currency} {Number(withdrawal.amount).toFixed(2)}</td>
+                      <td className="py-2.5 pr-4 text-right font-mono text-amber-400">৳ {Number(withdrawal.amount).toFixed(2)}</td>
                       <td className="py-2.5 pr-4 text-xs text-gray-400">{withdrawal.pspProvider}</td>
                       <td className="max-w-[220px] py-2.5 pr-4 text-xs text-gray-300">
                         {typeof withdrawal.payoutDetails?.type === 'string' ? withdrawal.payoutDetails.type : 'Account'}

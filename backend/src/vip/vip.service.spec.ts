@@ -33,8 +33,8 @@ function makeProgress(overrides: Record<string, any> = {}) {
   return {
     userId: 'u1',
     currentTier: 0,
-    totalWagerUsd: new Decimal(0),
-    periodWagerUsd: new Decimal(0),
+    totalWagerBdt: new Decimal(0),
+    periodWagerBdt: new Decimal(0),
     lastPromotedAt: null,
     ...overrides,
   };
@@ -65,7 +65,7 @@ describe('VipService', () => {
     it('accumulates wager on existing progress', async () => {
       const prisma = makePrisma();
       prisma.vipProgress.findUnique.mockResolvedValue(
-        makeProgress({ totalWagerUsd: new Decimal('200'), periodWagerUsd: new Decimal('200') }),
+        makeProgress({ totalWagerBdt: new Decimal('200'), periodWagerBdt: new Decimal('200') }),
       );
       prisma.vipProgress.update.mockResolvedValue({});
 
@@ -74,14 +74,14 @@ describe('VipService', () => {
 
       expect(prisma.vipProgress.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ totalWagerUsd: '250.00', periodWagerUsd: '250.00' }),
+          data: expect.objectContaining({ totalWagerBdt: '250.00', periodWagerBdt: '250.00' }),
         }),
       );
     });
 
     it('does not promote when no qualifying tier exists', async () => {
       const prisma = makePrisma();
-      prisma.vipProgress.findUnique.mockResolvedValue(makeProgress({ totalWagerUsd: new Decimal('50') }));
+      prisma.vipProgress.findUnique.mockResolvedValue(makeProgress({ totalWagerBdt: new Decimal('50') }));
       prisma.vipLevel.findMany.mockResolvedValue([]);
       prisma.vipProgress.update.mockResolvedValue({});
       const eventEmitter = makeEventEmitter();
@@ -95,9 +95,9 @@ describe('VipService', () => {
     it('promotes user when total wager crosses tier threshold', async () => {
       const prisma = makePrisma();
       prisma.vipProgress.findUnique.mockResolvedValue(
-        makeProgress({ currentTier: 0, totalWagerUsd: new Decimal('900') }),
+        makeProgress({ currentTier: 0, totalWagerBdt: new Decimal('900') }),
       );
-      const tier1 = { tier: 1, name: 'Silver', minWagerUsd: new Decimal('1000'), bonusAmount: new Decimal('50') };
+      const tier1 = { tier: 1, name: 'Silver', minWagerBdt: new Decimal('1000'), bonusAmount: new Decimal('50') };
       prisma.vipLevel.findMany.mockResolvedValue([tier1]);
       prisma.vipProgress.update.mockResolvedValue({});
       const eventEmitter = makeEventEmitter();
@@ -119,9 +119,9 @@ describe('VipService', () => {
     it('promotes to highest qualifying tier in one step', async () => {
       const prisma = makePrisma();
       prisma.vipProgress.findUnique.mockResolvedValue(
-        makeProgress({ currentTier: 0, totalWagerUsd: new Decimal('0') }),
+        makeProgress({ currentTier: 0, totalWagerBdt: new Decimal('0') }),
       );
-      const tier2 = { tier: 2, name: 'Gold', minWagerUsd: new Decimal('500'), bonusAmount: new Decimal('100') };
+      const tier2 = { tier: 2, name: 'Gold', minWagerBdt: new Decimal('500'), bonusAmount: new Decimal('100') };
       // findMany returns highest qualifying tier (desc order, take 1)
       prisma.vipLevel.findMany.mockResolvedValue([tier2]);
       prisma.vipProgress.update.mockResolvedValue({});
@@ -142,7 +142,7 @@ describe('VipService', () => {
       prisma.vipProgress.findUnique.mockRejectedValue(new Error('DB error'));
 
       const svc = makeService({ prisma });
-      await expect(svc.onBetPlaced({ userId: 'u1', amount: '10', currency: 'USD', gameRoundId: 'r1' })).resolves.not.toThrow();
+      await expect(svc.onBetPlaced({ userId: 'u1', amount: '10', currency: 'BDT', gameRoundId: 'r1' })).resolves.not.toThrow();
     });
   });
 
@@ -182,7 +182,7 @@ describe('VipService', () => {
       prisma.vipLevel.create.mockResolvedValue({ tier: 1 });
 
       const svc = makeService({ prisma });
-      await svc.createLevel({ tier: 1, name: 'Silver', minWagerUsd: '1000', bonusAmount: '50', cashbackRate: '0.02' });
+      await svc.createLevel({ tier: 1, name: 'Silver', minWagerBdt: '1000', bonusAmount: '50', cashbackRate: '0.02' });
 
       expect(prisma.vipLevel.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ tier: 1, name: 'Silver' }) }),

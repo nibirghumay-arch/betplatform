@@ -62,12 +62,12 @@ export default function AdminDashboardPage() {
             />
             <StatCard
               label="GGR (last snapshot)"
-              value={snap ? `$${parseFloat(snap.ggr).toFixed(2)}` : '—'}
+              value={snap ? `৳ ${parseFloat(snap.ggr).toFixed(2)}` : '—'}
               color="text-green-400"
             />
             <StatCard
               label="Deposits (last snapshot)"
-              value={snap ? `$${parseFloat(snap.totalDeposits).toFixed(2)}` : '—'}
+              value={snap ? `৳ ${parseFloat(snap.totalDeposits).toFixed(2)}` : '—'}
               color="text-blue-400"
             />
           </div>
@@ -88,8 +88,8 @@ export default function AdminDashboardPage() {
                       ['New Signups', snap.newPlayers],
                       ['Active Players', snap.activePlayers],
                       ['Total Bets', snap.totalBets],
-                      ['Total Withdrawals', `$${parseFloat(snap.totalWithdrawals).toFixed(2)}`],
-                      ['GGR', `$${parseFloat(snap.ggr).toFixed(2)}`],
+                      ['Total Withdrawals', `৳ ${parseFloat(snap.totalWithdrawals).toFixed(2)}`],
+                      ['GGR', `৳ ${parseFloat(snap.ggr).toFixed(2)}`],
                     ] as [string, string | number][]
                   ).map(([k, v]) => (
                     <div key={k} className="flex items-center justify-between text-sm">
@@ -124,10 +124,10 @@ export default function AdminDashboardPage() {
                             {String(s.snapshotDate).slice(0, 10)}
                           </td>
                           <td className="py-2 pr-3 text-right font-mono text-green-400">
-                            ${parseFloat(s.ggr).toFixed(2)}
+                            ৳ {parseFloat(s.ggr).toFixed(2)}
                           </td>
                           <td className="py-2 pr-3 text-right font-mono text-blue-400">
-                            ${parseFloat(s.totalDeposits).toFixed(2)}
+                            ৳ {parseFloat(s.totalDeposits).toFixed(2)}
                           </td>
                           <td className="py-2 text-right text-white">{s.totalPlayers}</td>
                         </tr>

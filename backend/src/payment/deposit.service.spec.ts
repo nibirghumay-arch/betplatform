@@ -33,7 +33,7 @@ function makePrisma(overrides: Record<string, any> = {}) {
 
 function makeWalletService(overrides: Record<string, any> = {}) {
   return {
-    getWalletByUserId: jest.fn().mockResolvedValue({ id: 'wallet-1', currency: 'USD', isActive: true, isFrozen: false }),
+    getWalletByUserId: jest.fn().mockResolvedValue({ id: 'wallet-1', currency: 'BDT', isActive: true, isFrozen: false }),
     assertWalletActive: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as any;
@@ -169,6 +169,42 @@ describe('DepositService', () => {
           data: expect.objectContaining({ amount: '25.50000000' }),
         }),
       );
+    });
+
+    it('accepts a legacy USD wallet and creates the deposit in BDT', async () => {
+      const prisma = makePrisma();
+      prisma.deposit.create.mockResolvedValue({ id: 'dep-bdt-legacy', pspProvider: 'stripe' });
+      prisma.deposit.update.mockResolvedValue({});
+      const walletService = makeWalletService({
+        getWalletByUserId: jest.fn().mockResolvedValue({
+          id: 'wallet-legacy-usd',
+          currency: 'USD',
+          isActive: true,
+          isFrozen: false,
+        }),
+      });
+      const svc = makeService({ prisma, walletService });
+
+      await svc.initiate({
+        userId: 'u1',
+        amount: '100',
+        currency: 'BDT',
+        pspProvider: 'stripe',
+      });
+
+      expect(prisma.deposit.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ currency: 'BDT' }),
+      }));
+    });
+
+    it('rejects an explicitly requested non-BDT deposit currency', async () => {
+      const svc = makeService();
+      await expect(svc.initiate({
+        userId: 'u1',
+        amount: '100',
+        currency: 'USD',
+        pspProvider: 'stripe',
+      })).rejects.toThrow('BetPlatform only supports BDT');
     });
 
     it('throws BadRequestException for amount <= 0', async () => {

@@ -102,6 +102,37 @@ describe('WalletService', () => {
       expect(result.id).toBe('wallet-abc');
     });
 
+    it('normalizes an existing USD wallet and its linked ledger records to BDT', async () => {
+      (prisma.wallet.findUnique as jest.Mock).mockResolvedValue({ ...WALLET_STUB, currency: 'USD' });
+
+      const tx = {
+        wallet: { update: jest.fn().mockResolvedValue({}) },
+        ledgerEntry: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findMany: jest.fn().mockResolvedValue([{ transactionId: 'tx-1' }]),
+        },
+        transaction: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        deposit: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        withdrawal: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        referralReward: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        bonus: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      };
+      (prisma as any).$transaction = jest.fn(async (callback: (client: any) => Promise<unknown>) => callback(tx));
+
+      const result = await service.getWalletByUserId('user-1');
+
+      expect(result.currency).toBe('BDT');
+      expect(tx.wallet.update).toHaveBeenCalledWith({
+        where: { id: 'wallet-abc' },
+        data: { currency: 'BDT' },
+      });
+      expect(tx.ledgerEntry.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { walletId: 'wallet-abc', currency: { not: 'BDT' } },
+        data: { currency: 'BDT' },
+      }));
+      expect(tx.transaction.updateMany).toHaveBeenCalled();
+    });
+
     it('throws NotFoundException when wallet does not exist', async () => {
       (prisma.wallet.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.getWalletByUserId('user-missing')).rejects.toBeInstanceOf(NotFoundException);

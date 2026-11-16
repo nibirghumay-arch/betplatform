@@ -39,7 +39,8 @@ export class WalletService {
 
   // ─── User Wallet Lifecycle ──────────────────────────────────────────────────
 
-  async createWallet(userId: string, currency = 'BDT'): Promise<WalletSummary> {
+  async createWallet(userId: string, _requestedCurrency = 'BDT'): Promise<WalletSummary> {
+    const currency = 'BDT';
     const existing = await this.prisma.wallet.findUnique({
       where: { userId },
       select: { id: true },
@@ -63,7 +64,7 @@ export class WalletService {
       select: { id: true, userId: true, currency: true, walletType: true, isActive: true, isFrozen: true },
     });
     if (!wallet) throw new NotFoundException(`Wallet not found for user ${userId}`);
-    return wallet;
+    return this.normalizeWalletToBdt(wallet);
   }
 
   async getWalletById(walletId: string): Promise<WalletSummary> {
@@ -72,7 +73,61 @@ export class WalletService {
       select: { id: true, userId: true, currency: true, walletType: true, isActive: true, isFrozen: true },
     });
     if (!wallet) throw new NotFoundException(`Wallet ${walletId} not found`);
-    return wallet;
+    return this.normalizeWalletToBdt(wallet);
+  }
+
+  /**
+   * Re-denominate legacy wallet records to BDT without changing any amounts.
+   * The update is idempotent and also repairs currency fields attached to the
+   * wallet so the first request after deployment cannot keep using USD rows.
+   */
+  private async normalizeWalletToBdt(wallet: WalletSummary): Promise<WalletSummary> {
+    if (wallet.currency === 'BDT') return wallet;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { currency: 'BDT' },
+      });
+      await tx.ledgerEntry.updateMany({
+        where: { walletId: wallet.id, currency: { not: 'BDT' } },
+        data: { currency: 'BDT' },
+      });
+
+      const ledgerRows = await tx.ledgerEntry.findMany({
+        where: { walletId: wallet.id },
+        select: { transactionId: true },
+      });
+      const transactionIds = [...new Set(ledgerRows.map((entry) => entry.transactionId))];
+      if (transactionIds.length > 0) {
+        await tx.transaction.updateMany({
+          where: { id: { in: transactionIds }, currency: { not: 'BDT' } },
+          data: { currency: 'BDT' },
+        });
+      }
+
+      if (wallet.userId) {
+        await tx.deposit.updateMany({
+          where: { userId: wallet.userId, currency: { not: 'BDT' } },
+          data: { currency: 'BDT' },
+        });
+        await tx.withdrawal.updateMany({
+          where: { userId: wallet.userId, currency: { not: 'BDT' } },
+          data: { currency: 'BDT' },
+        });
+        await tx.referralReward.updateMany({
+          where: { userId: wallet.userId, currency: { not: 'BDT' } },
+          data: { currency: 'BDT' },
+        });
+        await tx.bonus.updateMany({
+          where: { userId: wallet.userId, currency: { not: 'BDT' } },
+          data: { currency: 'BDT' },
+        });
+      }
+    });
+
+    this.logger.warn(`Legacy wallet currency normalized to BDT: walletId=${wallet.id}`);
+    return { ...wallet, currency: 'BDT' };
   }
 
   // ─── Balance ────────────────────────────────────────────────────────────────
@@ -144,8 +199,9 @@ export class WalletService {
    */
   async getOrCreateSystemWallet(
     type: 'SYSTEM' | 'HOUSE' | 'BONUS_POOL',
-    currency = 'BDT',
+    _requestedCurrency = 'BDT',
   ): Promise<string> {
+    const currency = 'BDT';
     const cacheKey = `${type}:${currency}`;
     const cached = this.systemWalletCache.get(cacheKey);
     if (cached) return cached;

@@ -357,7 +357,7 @@ function PaymentRequests() {
                 <div key={deposit.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3">
                   <div>
                     <p className="font-mono text-sm font-semibold text-amber-400">
-                      {deposit.currency === 'BDT' ? '৳' : `${deposit.currency} `}{Number(deposit.amount).toFixed(2)}
+                      ৳{Number(deposit.amount).toFixed(2)}
                     </p>
                     <p className="mt-0.5 text-xs text-gray-400">{deposit.paymentChannel || deposit.pspProvider}</p>
                     <p className="mt-0.5 text-[10px] text-gray-600">{new Date(deposit.createdAt).toLocaleString()}</p>
@@ -390,7 +390,7 @@ function PaymentRequests() {
                 <div key={withdrawal.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3">
                   <div>
                     <p className="font-mono text-sm font-semibold text-white">
-                      {withdrawal.currency === 'BDT' ? '৳' : `${withdrawal.currency} `}{Number(withdrawal.amount).toFixed(2)}
+                      ৳{Number(withdrawal.amount).toFixed(2)}
                     </p>
                     <p className="mt-0.5 text-xs text-gray-400">{withdrawal.pspProvider}</p>
                     <p className="mt-0.5 text-[10px] text-gray-600">{new Date(withdrawal.createdAt).toLocaleString()}</p>
@@ -467,7 +467,7 @@ function TransactionHistory() {
                         : 'text-red-400'
                     }>
                       {['DEPOSIT', 'WIN', 'BONUS_CREDIT'].includes(tx.type) ? '+' : '-'}
-                      {parseFloat(tx.amount).toFixed(2)}
+                      ৳{parseFloat(tx.amount).toFixed(2)}
                     </span>
                   </td>
                   <td className="py-2.5"><Badge label={tx.status} /></td>
@@ -510,7 +510,7 @@ export default function WalletPage() {
           <Spinner className="mt-2" />
         ) : (
           <p className="mt-1 text-4xl font-bold text-amber-400">
-            {balance ? `${balance.currency} ${parseFloat(balance.balance).toFixed(2)}` : '—'}
+            {balance ? `৳ ${parseFloat(balance.balance).toFixed(2)}` : '—'}
           </p>
         )}
       </div>

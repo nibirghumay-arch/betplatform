@@ -38,7 +38,7 @@ function CreateRuleForm({ onClose }: { onClose: () => void }) {
     resolver: zodResolver(ruleSchema),
     defaultValues: {
       bonusType: 'WELCOME',
-      configJson: '{"amount":"10","currency":"USD","wageringMultiplier":35}',
+      configJson: '{"amount":"10","currency":"BDT","wageringMultiplier":35}',
     },
   });
 
