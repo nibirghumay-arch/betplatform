@@ -199,10 +199,17 @@ A webhook signature is not treated as proof of payment. Only an approved order r
 back from the gateway can result in a wallet credit.
 
 The gateway project handles incoming Send Money deposits; it does not expose a merchant
-payout API. Withdrawal requests are recorded and reviewed in BetPlatform Admin →
-Payments → Withdrawal Queue. The current withdrawal approval implementation queues the
-request for processing; the actual bKash/Nagad/Rocket/Upay payout is still performed
-manually by the operator.
+payout API. Withdrawal requests and destinations are recorded in BetPlatform Admin →
+Payments → Withdrawal Queue and in the customer's Wallet → Payment Requests.
+
+When an administrator approves a withdrawal, BetPlatform reserves the funds by posting
+the withdrawal ledger debit and moving the request to PROCESSING. The operator then
+sends the payout using the listed bKash/Nagad/Rocket/Upay account and records the real
+transfer TrxID using **Mark as paid**. The request then becomes COMPLETED without a
+second debit. If the operator did not send the money, **Fail & refund** records the
+failure and posts a reversal to release the reserved funds. The site tracks the
+request and ledger entries, but the actual outbound transfer remains manual until the
+gateway vendor provides a merchant-scoped payout API.
 
 ## 5. Verify
 
