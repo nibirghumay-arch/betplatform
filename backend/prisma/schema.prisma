@@ -459,7 +459,7 @@ model VipLevel {
   id           String        @id @default(cuid())
   tier         Int           @unique
   name         String
-  minWagerUsd  Decimal       @db.Decimal(18, 2) @map("min_wager_usd")
+  minWagerBdt  Decimal       @db.Decimal(18, 2) @map("min_wager_bdt")
   bonusAmount  Decimal       @db.Decimal(18, 2) @map("bonus_amount")
   cashbackRate Decimal       @db.Decimal(5, 4) @map("cashback_rate")
   isActive     Boolean       @default(true) @map("is_active")
@@ -474,8 +474,8 @@ model VipProgress {
   id             String    @id @default(cuid())
   userId         String    @unique @map("user_id")
   currentTier    Int       @default(0) @map("current_tier")
-  totalWagerUsd  Decimal   @db.Decimal(18, 2) @default(0) @map("total_wager_usd")
-  periodWagerUsd Decimal   @db.Decimal(18, 2) @default(0) @map("period_wager_usd")
+  totalWagerBdt  Decimal   @db.Decimal(18, 2) @default(0) @map("total_wager_bdt")
+  periodWagerBdt Decimal   @db.Decimal(18, 2) @default(0) @map("period_wager_bdt")
   lastPromotedAt DateTime? @map("last_promoted_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   user           User      @relation(fields: [userId], references: [id])
