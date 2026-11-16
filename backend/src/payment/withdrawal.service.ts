@@ -145,6 +145,107 @@ export class WithdrawalService {
     );
   }
 
+  /**
+   * Complete a withdrawal after the operator has sent the money manually.
+   * The site's payment gateway currently has no payout API, so this records
+   * the operator's real transfer reference and debits the wallet exactly once.
+   */
+  async markManuallyPaid(
+    withdrawalId: string,
+    adminId: string,
+    payoutReference: string,
+  ): Promise<{ withdrawalId: string; status: WithdrawalStatus; transactionId: string }> {
+    const normalizedReference = payoutReference.trim();
+    if (normalizedReference.length < 4 || normalizedReference.length > 64) {
+      throw new BadRequestException('Enter a valid payout transaction/reference ID');
+    }
+
+    const withdrawal = await this.findById(withdrawalId);
+    if (withdrawal.status === WithdrawalStatus.COMPLETED && withdrawal.transactionId) {
+      return {
+        withdrawalId,
+        status: withdrawal.status,
+        transactionId: withdrawal.transactionId,
+      };
+    }
+    if (withdrawal.status !== WithdrawalStatus.PROCESSING) {
+      throw new BadRequestException(
+        `Withdrawal ${withdrawalId} must be approved and in PROCESSING before it can be marked paid`,
+      );
+    }
+
+    const wallet = await this.walletService.getWalletByUserId(withdrawal.userId);
+    await this.walletService.assertWalletActive(wallet.id);
+    if (wallet.currency !== withdrawal.currency) {
+      throw new BadRequestException(
+        `Withdrawal currency ${withdrawal.currency} does not match wallet currency ${wallet.currency}`,
+      );
+    }
+
+    const ledgerReference = `withdrawal:${withdrawal.id}`;
+    let transaction = await this.prisma.transaction.findUnique({
+      where: { reference: ledgerReference },
+      select: { id: true },
+    });
+
+    // A retry after an interrupted admin action reuses the already-created
+    // ledger transaction rather than debiting the wallet twice.
+    if (!transaction) {
+      try {
+        const result = await this.transactionService.withdraw({
+          userId: withdrawal.userId,
+          amount: new Decimal(withdrawal.amount.toString()),
+          reference: ledgerReference,
+          description: `Manual payout via ${withdrawal.pspProvider}`,
+          metadata: {
+            withdrawalId: withdrawal.id,
+            manualPayoutReference: normalizedReference,
+            markedPaidBy: adminId,
+          },
+          initiatedBy: adminId,
+        });
+        transaction = { id: result.transactionId };
+      } catch (error) {
+        // Handle concurrent double-clicks / retries. The transaction reference
+        // is unique, so a second request can recover the winner's transaction.
+        transaction = await this.prisma.transaction.findUnique({
+          where: { reference: ledgerReference },
+          select: { id: true },
+        });
+        if (!transaction) throw error;
+      }
+    }
+
+    await this.prisma.withdrawal.updateMany({
+      where: {
+        id: withdrawal.id,
+        status: WithdrawalStatus.PROCESSING,
+        transactionId: null,
+      },
+      data: {
+        status: WithdrawalStatus.COMPLETED,
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+        pspReference: normalizedReference,
+        transactionId: transaction.id,
+      },
+    });
+
+    const completed = await this.findById(withdrawalId);
+    if (completed.status !== WithdrawalStatus.COMPLETED || completed.transactionId !== transaction.id) {
+      throw new BadRequestException('Withdrawal status changed while the payout was being recorded');
+    }
+
+    this.logger.warn(
+      `Manual withdrawal completed: id=${withdrawalId} admin=${adminId} payoutReference=${normalizedReference} txId=${transaction.id}`,
+    );
+    return {
+      withdrawalId,
+      status: completed.status,
+      transactionId: transaction.id,
+    };
+  }
+
   // ─── Admin: reject ──────────────────────────────────────────────────────────
 
   async reject(withdrawalId: string, adminId: string, reason: string): Promise<void> {
