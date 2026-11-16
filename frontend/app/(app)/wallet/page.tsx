@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -284,6 +285,135 @@ function WithdrawCard() {
   );
 }
 
+// ─── Payment request tracking ───────────────────────────────────────────────
+
+type CustomerDepositRequest = {
+  id: string;
+  amount: string;
+  currency: string;
+  status: string;
+  pspProvider: string;
+  paymentChannel?: string | null;
+  createdAt: string;
+};
+
+type CustomerWithdrawalRequest = {
+  id: string;
+  amount: string;
+  currency: string;
+  status: string;
+  pspProvider: string;
+  createdAt: string;
+};
+
+function PaymentRequests() {
+  const queryClient = useQueryClient();
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState('');
+
+  const deposits = useQuery<CustomerDepositRequest[]>({
+    queryKey: ['payment-requests', 'deposits'],
+    queryFn: () => api.get('/payment/deposit', { params: { take: 20 } }).then((r) => r.data),
+    refetchInterval: 15000,
+  });
+  const withdrawals = useQuery<CustomerWithdrawalRequest[]>({
+    queryKey: ['payment-requests', 'withdrawals'],
+    queryFn: () => api.get('/payment/withdrawal', { params: { take: 20 } }).then((r) => r.data),
+    refetchInterval: 15000,
+  });
+
+  const cancelWithdrawal = async (id: string) => {
+    setCancellingId(id);
+    setCancelError('');
+    try {
+      await api.post(`/payment/withdrawal/${id}/cancel`);
+      await queryClient.invalidateQueries({ queryKey: ['payment-requests', 'withdrawals'] });
+    } catch (err) {
+      setCancelError(apiError(err));
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  return (
+    <Card className="col-span-full">
+      <div className="mb-4">
+        <CardTitle>Payment Requests</CardTitle>
+        <p className="text-xs text-gray-500">Track your deposits and withdrawals inside BetPlatform. Status refreshes automatically.</p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-white">Deposit requests</h3>
+          {deposits.isLoading ? (
+            <div className="flex justify-center py-6"><Spinner /></div>
+          ) : deposits.isError ? (
+            <p className="py-4 text-sm text-red-400">{apiError(deposits.error)}</p>
+          ) : (deposits.data ?? []).length === 0 ? (
+            <p className="rounded-lg bg-white/5 px-3 py-4 text-sm text-gray-500">No deposit requests yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {(deposits.data ?? []).map((deposit) => (
+                <div key={deposit.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3">
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-amber-400">
+                      {deposit.currency === 'BDT' ? '৳' : `${deposit.currency} `}{Number(deposit.amount).toFixed(2)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-400">{deposit.paymentChannel || deposit.pspProvider}</p>
+                    <p className="mt-0.5 text-[10px] text-gray-600">{new Date(deposit.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge label={deposit.status.replace(/_/g, ' ')} />
+                    {deposit.pspProvider === 'bdgateway' && ['PENDING_PAYMENT', 'PROCESSING'].includes(deposit.status) && (
+                      <Link href={`/wallet/deposit/pay/${deposit.id}`}>
+                        <Button size="sm" variant="secondary">Continue</Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h3 className="mb-3 text-sm font-semibold text-white">Withdrawal requests</h3>
+          {withdrawals.isLoading ? (
+            <div className="flex justify-center py-6"><Spinner /></div>
+          ) : withdrawals.isError ? (
+            <p className="py-4 text-sm text-red-400">{apiError(withdrawals.error)}</p>
+          ) : (withdrawals.data ?? []).length === 0 ? (
+            <p className="rounded-lg bg-white/5 px-3 py-4 text-sm text-gray-500">No withdrawal requests yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {(withdrawals.data ?? []).map((withdrawal) => (
+                <div key={withdrawal.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3">
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-white">
+                      {withdrawal.currency === 'BDT' ? '৳' : `${withdrawal.currency} `}{Number(withdrawal.amount).toFixed(2)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-400">{withdrawal.pspProvider}</p>
+                    <p className="mt-0.5 text-[10px] text-gray-600">{new Date(withdrawal.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge label={withdrawal.status.replace(/_/g, ' ')} />
+                    {['PENDING_KYC', 'PENDING_REVIEW'].includes(withdrawal.status) && (
+                      <Button size="sm" variant="ghost" loading={cancellingId === withdrawal.id} onClick={() => cancelWithdrawal(withdrawal.id)}>
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+      {cancelError && <p className="mt-3 text-sm text-red-400">{cancelError}</p>}
+    </Card>
+  );
+}
+
 // ─── Transaction history ──────────────────────────────────────────────────
 
 const TX_TYPES = ['', 'DEPOSIT', 'WITHDRAWAL', 'BET', 'WIN', 'BONUS_CREDIT', 'BONUS_DEBIT'];
@@ -394,6 +524,11 @@ export default function WalletPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <DepositCard />
         <WithdrawCard />
+      </div>
+
+      {/* Requests are tracked independently from ledger transactions. */}
+      <div className="mb-6">
+        <PaymentRequests />
       </div>
 
       {/* Transaction history */}
