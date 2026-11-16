@@ -24,14 +24,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   /**
    * One-time data-only migration for existing databases. It changes currency
    * labels to BDT but deliberately leaves every numeric amount unchanged.
-   * The internal system-setting marker plus advisory lock keeps this safe for
-   * concurrent serverless cold starts; no schema DDL is required here.
+   * Updates are idempotent, so concurrent serverless cold starts can safely
+   * run them without a PostgreSQL void-returning advisory-lock query.
    */
   private async enforceBdtOnlyCurrency(): Promise<void> {
     const migrationKey = '__internal.platform_currency_bdt_v1';
 
     await this.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(74003211)`;
       const marker = await tx.systemSetting.findUnique({
         where: { key: migrationKey },
         select: { key: true },
@@ -62,8 +61,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           AND ("value"::jsonb ->> 'currency') IS DISTINCT FROM 'BDT'
       `;
 
-      await tx.systemSetting.create({
-        data: {
+      await tx.systemSetting.upsert({
+        where: { key: migrationKey },
+        update: {
+          value: { currency: 'BDT', numericAmountsChanged: false },
+        },
+        create: {
           key: migrationKey,
           value: { currency: 'BDT', numericAmountsChanged: false },
         },
