@@ -166,6 +166,21 @@ export class WalletService {
         }
       }
 
+      if (balance.isZero()) {
+        await tx.transaction.create({
+          data: {
+            type: 'MANUAL_CREDIT',
+            status: 'COMPLETED',
+            amount: '0',
+            currency: 'BDT',
+            reference: `${reference}:zero-balance-audit`,
+            description: 'Approved USD to BDT currency migration with zero opening balance',
+            metadata: metadata as any,
+            initiatedBy: adminId,
+          },
+        });
+      }
+
       await tx.wallet.update({ where: { id: wallet.id }, data: { currency: 'BDT' } });
       return {
         walletId: wallet.id,
