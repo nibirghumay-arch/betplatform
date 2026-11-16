@@ -16,12 +16,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={clsx(
-          'inline-flex items-center justify-center rounded-lg font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0f0f0f] disabled:opacity-50 disabled:cursor-not-allowed',
+          'bp-button inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0d1224] disabled:opacity-50 disabled:cursor-not-allowed',
           {
-            'bg-amber-500 text-black hover:bg-amber-400 focus:ring-amber-500': variant === 'primary',
-            'bg-white/10 text-white hover:bg-white/20 focus:ring-white/30': variant === 'secondary',
-            'text-white hover:bg-white/10 focus:ring-white/20': variant === 'ghost',
-            'bg-red-600 text-white hover:bg-red-500 focus:ring-red-500': variant === 'danger',
+            'bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500 text-white hover:from-violet-400 hover:via-indigo-400 hover:to-sky-400 focus:ring-violet-400 shadow-lg shadow-violet-950/30': variant === 'primary',
+            'border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20 focus:ring-cyan-300/40': variant === 'secondary',
+            'text-slate-200 hover:bg-violet-400/10 hover:text-violet-100 focus:ring-violet-300/30': variant === 'ghost',
+            'bg-gradient-to-r from-rose-600 to-pink-500 text-white hover:from-rose-500 hover:to-pink-400 focus:ring-rose-400': variant === 'danger',
             'px-3 py-1.5 text-sm': size === 'sm',
             'px-4 py-2 text-sm': size === 'md',
             'px-6 py-3 text-base': size === 'lg',
