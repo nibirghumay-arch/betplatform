@@ -3,20 +3,15 @@ import axios from 'axios';
 // A production visitor cannot reach localhost on the server owner's machine.
 // Use the BetPlatform API site as the production fallback if Netlify's
 // NEXT_PUBLIC_API_URL is missing or was accidentally set to the local example.
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 const isProduction = process.env.NODE_ENV === 'production';
-const isLoopbackUrl = Boolean(
-  configuredApiUrl &&
-  /^https?:\/\/(localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?(?:\/|$)/i.test(configuredApiUrl),
-);
-const defaultApiUrl = isProduction
-  ? 'https://betplatform-api.netlify.app/api/v1'
-  : 'http://localhost:3000/api/v1';
-const apiBaseUrl = (
-  configuredApiUrl && !(isProduction && isLoopbackUrl)
-    ? configuredApiUrl
-    : defaultApiUrl
-).replace(/\/+$/, '');
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+// Production API calls are same-origin. Netlify proxies /api/v1/* to the
+// private backend site, avoiding browser CORS and stale external API settings.
+// Local development can still point at another API origin.
+const apiBaseUrl = isProduction
+  ? '/api/v1'
+  : (configuredApiUrl || 'http://localhost:3000/api/v1').replace(/\/+$/, '');
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
