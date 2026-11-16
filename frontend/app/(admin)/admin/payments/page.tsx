@@ -74,6 +74,8 @@ export default function PaymentsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [payoutTarget, setPayoutTarget] = useState<string | null>(null);
   const [payoutReference, setPayoutReference] = useState('');
+  const [failPayoutTarget, setFailPayoutTarget] = useState<string | null>(null);
+  const [failPayoutReason, setFailPayoutReason] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [settingsNotice, setSettingsNotice] = useState('');
   const [copiedWebhook, setCopiedWebhook] = useState(false);
@@ -168,6 +170,22 @@ export default function PaymentsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
     },
   });
+
+  const failPayout = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.post(`/admin/withdrawal/${id}/fail-payout`, { reason }).then((r) => r.data),
+    onSuccess: () => {
+      setFailPayoutTarget(null);
+      setFailPayoutReason('');
+      queryClient.invalidateQueries({ queryKey: ['admin', 'withdrawals'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+    },
+  });
+
+  const submitFailPayout = () => {
+    if (!failPayoutTarget || failPayoutReason.trim().length < 4) return;
+    failPayout.mutate({ id: failPayoutTarget, reason: failPayoutReason.trim() });
+  };
 
   const submitMarkPaid = () => {
     if (!payoutTarget || payoutReference.trim().length < 4) return;
@@ -392,7 +410,10 @@ export default function PaymentsPage() {
                               <Button size="sm" variant="danger" onClick={() => setRejectTarget(withdrawal.id)}>Reject</Button>
                             )}
                             {withdrawalStatus === 'PROCESSING' && (
-                              <Button size="sm" onClick={() => setPayoutTarget(withdrawal.id)}>Mark as paid</Button>
+                              <>
+                                <Button size="sm" onClick={() => setPayoutTarget(withdrawal.id)}>Mark as paid</Button>
+                                <Button size="sm" variant="danger" onClick={() => setFailPayoutTarget(withdrawal.id)}>Fail & refund</Button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -562,6 +583,45 @@ export default function PaymentsPage() {
               </Card>
             </>
           )}
+        </div>
+      )}
+
+      {failPayoutTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#16161f] p-6 shadow-2xl">
+            <h3 className="mb-2 text-lg font-semibold text-white">Fail payout and refund reserve</h3>
+            <p className="mb-4 text-sm text-gray-400">
+              Use only when the external transfer was not completed. BetPlatform will credit the reserved amount back to the player's wallet and mark the withdrawal failed.
+            </p>
+            <label className="mb-1 block text-sm text-gray-300">Failure reason</label>
+            <textarea
+              value={failPayoutReason}
+              onChange={(event) => setFailPayoutReason(event.target.value)}
+              placeholder="Explain why this payout was not sent..."
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+              rows={3}
+              maxLength={500}
+            />
+            {failPayout.isError && <p className="mt-3 text-sm text-red-400">{apiError(failPayout.error)}</p>}
+            <div className="mt-4 flex gap-3">
+              <Button
+                variant="danger"
+                loading={failPayout.isPending}
+                disabled={failPayoutReason.trim().length < 4}
+                onClick={submitFailPayout}
+                className="flex-1"
+              >
+                Fail and refund
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => { setFailPayoutTarget(null); setFailPayoutReason(''); failPayout.reset(); }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
